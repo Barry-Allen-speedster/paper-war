@@ -15,11 +15,15 @@ import type { RNG } from "../game/rng";
 const C = DEFAULT_CONFIG;
 
 /**
- * The ideal shot position for a target unit is just its normalized position —
- * because the fold maps (u,v) on own half to the same (u,v) on opponent's half.
+ * The ideal shot position for a target unit.
+ *
+ * The AI aims on ITS OWN half. BattlefieldScreen.handleFoldComplete
+ * then mirrors the X axis (1 - x) before computing the hit.
+ * So to land at unit.pos.x on the OPPONENT's half, the AI must aim at
+ * (1 - unit.pos.x) on its own half. Y is unchanged (fold preserves Y).
  */
 export function idealShot(unit: Unit): Vec2 {
-  return { x: unit.pos.x, y: unit.pos.y };
+  return { x: 1 - unit.pos.x, y: unit.pos.y };
 }
 
 /**
