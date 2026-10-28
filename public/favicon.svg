@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Paper background -->
+  <rect x="4" y="4" width="56" height="56" rx="6" fill="#f8f7f2" stroke="#c8c4b8" stroke-width="2"/>
+  
+  <!-- Crease line (red, like a notebook margin) -->
+  <line x1="32" y1="4" x2="32" y2="60" stroke="#cc3333" stroke-width="2.5" stroke-dasharray="none"/>
+  
+  <!-- Left half: stick soldier with sword -->
+  <circle cx="16" cy="18" r="4" stroke="#2244cc" stroke-width="1.8" fill="none"/>
+  <line x1="16" y1="22" x2="16" y2="34" stroke="#2244cc" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="16" y1="26" x2="10" y2="22" stroke="#2244cc" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="16" y1="26" x2="23" y2="29" stroke="#2244cc" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="16" y1="34" x2="11" y2="43" stroke="#2244cc" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="16" y1="34" x2="21" y2="43" stroke="#2244cc" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Sword -->
+  <line x1="10" y1="22" x2="6" y2="15" stroke="#2244cc" stroke-width="2.2" stroke-linecap="round"/>
+  <line x1="8" y1="20" x2="11" y2="17" stroke="#2244cc" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Right half: stick king with crown -->
+  <!-- Crown -->
+  <polyline points="40,14 42,10 45,13 48,9 51,13 54,10 56,14 40,14" stroke="#cc3333" stroke-width="1.6" fill="none" stroke-linejoin="round"/>
+  <circle cx="48" cy="9" r="1.5" fill="#cc3333"/>
+  <!-- Head -->
+  <circle cx="48" cy="19" r="4.5" stroke="#cc3333" stroke-width="1.8" fill="none"/>
+  <!-- Body -->
+  <line x1="48" y1="23.5" x2="48" y2="35" stroke="#cc3333" stroke-width="2" stroke-linecap="round"/>
+  <!-- Cape arms -->
+  <path d="M48,27 L40,33 L43,35" stroke="#cc3333" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M48,27 L56,33 L53,35" stroke="#cc3333" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Legs -->
+  <line x1="48" y1="35" x2="43" y2="44" stroke="#cc3333" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="48" y1="35" x2="53" y2="44" stroke="#cc3333" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- Shot dot on right half (ink bleed effect) -->
+  <circle cx="42" cy="26" r="3" fill="#2244cc" opacity="0.7"/>
+  <circle cx="42" cy="26" r="5" fill="none" stroke="#2244cc" stroke-width="0.8" opacity="0.3"/>
+</svg>
