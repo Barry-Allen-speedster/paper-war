@@ -316,7 +316,7 @@ export function GameLobby({ initialCode }: Props) {
         ) : connectionStatus === "connecting" ? (
           <div className="flex items-center gap-2 text-[var(--pw-text-muted)]">
             <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block animate-pulse" />
-            Connecting…
+            Connecting… (retrying automatically if needed)
           </div>
         ) : (
           <div className="text-red-500">Connection failed.</div>

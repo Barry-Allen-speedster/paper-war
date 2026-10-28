@@ -1,7 +1,6 @@
 /**
  * PeerJS transport implementation.
- * Maps 4-digit room codes to peer IDs: paperwar-{code}
- * Host creates the peer; guest connects to host's peer ID.
+ * Uses the default PeerJS cloud signaling server.
  */
 import type { Transport, ConnectionStatus } from "./transport";
 import type { NetMessage } from "./protocol";
@@ -12,15 +11,12 @@ const C = DEFAULT_CONFIG;
 
 type MessageHandler = (message: NetMessage) => void;
 type StatusHandler = (status: ConnectionStatus) => void;
-type CodeHandler = (code: string) => void;
 
 export class PeerJSTransport implements Transport {
   private peer: any = null;
   private conn: any = null;
   private messageHandlers: Set<MessageHandler> = new Set();
   private statusHandlers: Set<StatusHandler> = new Set();
-  /** Fires with the actual room code (may differ from requested if there was a retry) */
-  private codeHandlers: Set<CodeHandler> = new Set();
   private seqSent = 0;
   private seenSeqs = new Set<number>();
 
@@ -63,23 +59,34 @@ export class PeerJSTransport implements Transport {
           peer.destroy();
           const newCode = String(Math.floor(1000 + Math.random() * 9000));
           this.connectAsHost(Peer, newCode, attempt + 1).then(resolve).catch(reject);
+        } else if (err.type === "network" || err.type === "server-error") {
+          // PeerJS server blip — retry once
+          if (attempt < 2) {
+            peer.destroy();
+            setTimeout(() => {
+              this.connectAsHost(Peer, roomCode, attempt + 1).then(resolve).catch(reject);
+            }, 2000);
+          } else {
+            reject(new Error(`PeerJS error: ${err.type}`));
+          }
         } else {
           reject(new Error(`PeerJS error: ${err.type}`));
         }
       });
 
       peer.on("open", () => {
-        // Host is registered — waiting for a guest; status is "connecting" until guest arrives
-        resolve(roomCode); // surfaced actual code
+        // Peer registered on signaling server — waiting for guest now
+        // Status stays "connecting" until guest actually connects
+        resolve(roomCode);
       });
 
       peer.on("connection", (conn: unknown) => {
         this.conn = conn;
-        (conn as any).on("data", (data: unknown) => this.handleData(data));
         (conn as any).on("open", () => {
-          // Guest has fully connected — NOW we are "connected"
+          // Guest data channel fully open — NOW we are truly connected
           this.setStatus("connected");
         });
+        (conn as any).on("data", (data: unknown) => this.handleData(data));
         (conn as any).on("close", () => this.setStatus("reconnecting"));
       });
 
@@ -87,14 +94,37 @@ export class PeerJSTransport implements Transport {
     });
   }
 
-  private connectAsGuest(Peer: any, roomCode: string): Promise<void> {
+  private connectAsGuest(Peer: any, roomCode: string, attempt = 0): Promise<void> {
     return new Promise((resolve, reject) => {
       const peer = new Peer();
       this.peer = peer;
 
+      // 25 second timeout — PeerJS can be slow on mobile
       const timeout = setTimeout(() => {
+        peer.destroy();
         reject(new Error("Connection timed out — is the room code correct?"));
-      }, 15000);
+      }, 25000);
+
+      peer.on("error", (e: { type: string; message?: string }) => {
+        // Peer-unavailable means the host hasn't registered yet or wrong code
+        // Retry up to 3 times with 2s delay
+        if ((e.type === "peer-unavailable" || e.type === "network") && attempt < 3) {
+          peer.destroy();
+          clearTimeout(timeout);
+          setTimeout(() => {
+            this.connectAsGuest(Peer, roomCode, attempt + 1)
+              .then(resolve)
+              .catch(reject);
+          }, 2000);
+        } else {
+          clearTimeout(timeout);
+          peer.destroy();
+          const msg = e.type === "peer-unavailable"
+            ? "Room not found. Check the code and try again."
+            : `Could not connect (${e.type}).`;
+          reject(new Error(msg));
+        }
+      });
 
       peer.on("open", () => {
         const hostId = `${C.PEER_ID_PREFIX}${roomCode}`;
@@ -116,10 +146,6 @@ export class PeerJSTransport implements Transport {
         });
       });
 
-      peer.on("error", (e: Error) => {
-        clearTimeout(timeout);
-        reject(e);
-      });
       peer.on("disconnected", () => this.setStatus("reconnecting"));
     });
   }
@@ -133,7 +159,6 @@ export class PeerJSTransport implements Transport {
       console.warn("[PeerJS] Cannot send: no connection yet");
       return;
     }
-    // conn.open may be undefined before the connection fires "open"
     if (this.conn.open === false) {
       console.warn("[PeerJS] Cannot send: connection not open");
       return;
