@@ -1,82 +1,136 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+/**
+ * GameLobby — online multiplayer lobby.
+ *
+ * Flow:
+ *   Both players land here from /play/online (phase === "Lobby").
+ *   Host: creates a PeerJS peer, waits for guest to connect, then clicks Start.
+ *   Guest: enters the 4-digit code, connects to host, waits for host to start.
+ *
+ * When the host clicks Start:
+ *   1. Host dispatches ADVANCE_FROM_LOBBY → phase becomes Setup.
+ *   2. Host sends { type: "startGame" } to guest.
+ *   3. Guest receives it → dispatches ADVANCE_FROM_LOBBY → phase becomes Setup.
+ *   Both sides now render UnitDeployment in online/page.tsx.
+ */
+import { useState, useEffect, useRef } from "react";
 import { useNetStore } from "@hooks/useNetStore";
 import { useGameStore } from "@hooks/useGameStore";
 import { PeerJSTransport } from "@lib/net/peerjs";
 import { Button } from "@components/ui/Button";
-import { ConnectionBadge } from "./ConnectionBadge";
-import { t } from "@lib/i18n";
 import { Copy } from "lucide-react";
 
 interface Props {
-  /** If provided, auto-join as guest with this code (from /join/[code] deep link) */
+  /** Pre-filled code when arriving via /join/[code] deep link */
   initialCode?: string;
 }
 
 type Screen = "pick" | "hosting" | "joining";
 
 export function GameLobby({ initialCode }: Props) {
-  const router = useRouter();
   const { setTransport, setConnectionStatus, setRoomCode, setPeerRole, reset, roomCode, connectionStatus } =
     useNetStore();
   const { dispatch } = useGameStore();
 
-  // If arriving via deep link, skip straight to joining
   const [screen, setScreen] = useState<Screen>(initialCode ? "joining" : "pick");
-  const [guestCode, setGuestCode] = useState(initialCode ?? "");
+  const [guestInput, setGuestInput] = useState(initialCode ?? "");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const transportRef = useRef<PeerJSTransport | null>(null);
 
   const shareLink =
     typeof window !== "undefined" && roomCode
       ? `${window.location.origin}/join/${roomCode}`
       : "";
 
-  // ── Host ────────────────────────────────────────────────────────────────────
-  const startAsHost = useCallback(async () => {
+  // ── Listen for messages from peer ───────────────────────────────────────────
+  useEffect(() => {
+    const transport = transportRef.current;
+    if (!transport) return;
+
+    const unsub = transport.onMessage((msg) => {
+      if (msg.type === "hello") {
+        // Guest connected — host already got status "connected" via PeerJS event
+        // Nothing extra needed; UI reacts to connectionStatus
+      }
+      if (msg.type === "startGame") {
+        // Guest receives this from host → advance to Setup
+        dispatch({ type: "ADVANCE_FROM_LOBBY" });
+      }
+    });
+
+    return unsub;
+  });
+
+  // Cleanup transport on unmount
+  useEffect(() => {
+    return () => {
+      // Only reset if we haven't started the game
+      // (if we did start, transport stays alive for the game)
+    };
+  }, []);
+
+  // ── Host ─────────────────────────────────────────────────────────────────────
+  async function startAsHost() {
     setError(null);
     const code = String(Math.floor(1000 + Math.random() * 9000));
     const transport = new PeerJSTransport();
-    transport.onStatus((s) => setConnectionStatus(s));
+    transportRef.current = transport;
+
+    transport.onStatus((s) => {
+      setConnectionStatus(s);
+    });
+
     try {
-      await transport.connect(code, "host");
+      const actualCode = await transport.connect(code, "host");
       setTransport(transport);
-      setRoomCode(code);
+      setRoomCode(actualCode);
       setPeerRole("host");
       setScreen("hosting");
     } catch (err) {
-      setError("Could not create room. Check your connection and try again.");
+      setError("Could not create room. Check your internet connection.");
       console.error(err);
     }
-  }, [setConnectionStatus, setTransport, setRoomCode, setPeerRole]);
+  }
 
-  // ── Guest ───────────────────────────────────────────────────────────────────
-  const joinAsGuest = useCallback(async () => {
-    const code = guestCode.trim();
+  // ── Guest ────────────────────────────────────────────────────────────────────
+  async function joinAsGuest(code: string) {
     if (code.length !== 4) return;
     setError(null);
+
     const transport = new PeerJSTransport();
+    transportRef.current = transport;
+
     transport.onStatus((s) => setConnectionStatus(s));
+
     try {
       await transport.connect(code, "guest");
       setTransport(transport);
       setRoomCode(code);
       setPeerRole("guest");
-      // Stay on joining screen — show connection status
-    } catch {
-      setError("Room not found. Make sure your friend's code is correct.");
+      // Stay on "joining" screen — wait for host to send startGame
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(`Could not connect: ${msg}. Check the code and try again.`);
+      setScreen("pick");
     }
-  }, [guestCode, setConnectionStatus, setTransport, setRoomCode, setPeerRole]);
+  }
 
-  // Auto-join when arriving via deep link
+  // ── Auto-join from deep link ─────────────────────────────────────────────────
   useEffect(() => {
-    if (initialCode) {
-      void joinAsGuest();
-    }
-    return () => reset();
+    if (initialCode) void joinAsGuest(initialCode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Host starts the game ─────────────────────────────────────────────────────
+  function handleHostStart() {
+    const transport = transportRef.current;
+    if (!transport) return;
+    // Tell guest to start
+    transport.send({ type: "startGame", seq: 1 });
+    // Host advances locally
+    dispatch({ type: "ADVANCE_FROM_LOBBY" });
+  }
 
   function copyCode() {
     if (!roomCode) return;
@@ -94,140 +148,137 @@ export function GameLobby({ initialCode }: Props) {
     });
   }
 
-  function handleStartGame() {
-    const myRole = screen === "hosting" ? "host" : "guest";
-    dispatch({ type: "LOCK_LAYOUT", playerId: myRole === "host" ? "p1" : "p2" });
-    router.push("/play/online");
-  }
-
   function handleBack() {
+    transportRef.current?.disconnect();
+    transportRef.current = null;
     reset();
     setScreen("pick");
     setError(null);
-    setGuestCode("");
+    setGuestInput("");
   }
 
-  function handleCancel() {
-    reset();
-    router.push("/");
-  }
-
-  // ── SCREEN: Pick host or join ────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
+  // SCREEN: Pick
+  // ────────────────────────────────────────────────────────────────────────────
   if (screen === "pick") {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--pw-bg)]">
         <h1 className="text-3xl font-bold mb-2">Online</h1>
         <p className="text-[var(--pw-text-muted)] text-sm mb-10 text-center max-w-xs">
-          One player hosts and shares a 4-digit code. The other enters it to join.
+          Host creates a room and shares the code. The other player enters it to join.
         </p>
 
         <div className="flex flex-col gap-4 w-full max-w-xs">
-          <Button
-            onClick={() => void startAsHost()}
-            className="w-full py-5 text-lg"
-          >
+          {/* Create room */}
+          <Button onClick={() => void startAsHost()} className="w-full py-5 text-lg">
             🏠 Create a Room
           </Button>
 
-          <div className="relative flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <div className="flex-1 h-px bg-[var(--pw-border)]" />
             <span className="text-xs text-[var(--pw-text-muted)]">or</span>
             <div className="flex-1 h-px bg-[var(--pw-border)]" />
           </div>
 
-          <div>
-            <p className="text-sm font-medium mb-2 text-center">Enter a room code</p>
-            <input
-              type="text"
-              inputMode="numeric"
-              maxLength={4}
-              value={guestCode}
-              onChange={(e) => setGuestCode(e.target.value.replace(/\D/g, ""))}
-              placeholder="1234"
-              className="w-full text-center text-4xl font-bold tracking-[0.5em] border-2 border-[var(--pw-border)] rounded-xl p-4 bg-[var(--pw-surface)] mb-3 focus:border-[var(--pw-accent)] outline-none"
-              onKeyDown={(e) => { if (e.key === "Enter" && guestCode.length === 4) { setScreen("joining"); void joinAsGuest(); } }}
-            />
-            <Button
-              onClick={() => { setScreen("joining"); void joinAsGuest(); }}
-              disabled={guestCode.length !== 4}
-              variant="secondary"
-              className="w-full py-4 text-lg"
-            >
-              🚀 Join Room
-            </Button>
-          </div>
+          {/* Enter code */}
+          <p className="text-sm font-medium text-center">Enter room code to join</p>
+          <input
+            type="text"
+            inputMode="numeric"
+            maxLength={4}
+            value={guestInput}
+            onChange={(e) => setGuestInput(e.target.value.replace(/\D/g, ""))}
+            placeholder="1 2 3 4"
+            autoFocus
+            className="w-full text-center text-5xl font-bold tracking-[0.5em] border-2 border-[var(--pw-border)] rounded-xl p-4 bg-[var(--pw-surface)] focus:border-[var(--pw-accent)] outline-none"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && guestInput.length === 4) {
+                setScreen("joining");
+                void joinAsGuest(guestInput);
+              }
+            }}
+          />
+          <Button
+            onClick={() => { setScreen("joining"); void joinAsGuest(guestInput); }}
+            disabled={guestInput.length !== 4}
+            variant="secondary"
+            className="w-full py-4 text-lg"
+          >
+            🚀 Join Room
+          </Button>
         </div>
 
         {error && (
-          <div role="alert" className="mt-4 px-4 py-3 rounded-lg bg-red-900/20 border border-red-500 text-red-400 text-sm text-center max-w-xs">
+          <div role="alert" className="mt-4 px-4 py-3 rounded-lg bg-red-100 border border-red-400 text-red-700 text-sm text-center max-w-xs">
             {error}
           </div>
         )}
-
-        <Button variant="ghost" onClick={handleCancel} className="mt-6 text-sm">
-          ← Back to Menu
-        </Button>
       </div>
     );
   }
 
-  // ── SCREEN: Hosting — show code to share ────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
+  // SCREEN: Hosting — show code, wait for guest, then host starts
+  // ────────────────────────────────────────────────────────────────────────────
   if (screen === "hosting") {
+    const guestConnected = connectionStatus === "connected";
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--pw-bg)]">
         <h1 className="text-2xl font-bold mb-2">Share this code</h1>
         <p className="text-[var(--pw-text-muted)] text-sm mb-8 text-center max-w-xs">
-          Tell your friend to go to the Online tab and enter this code.
+          Tell your friend to open Paper War, tap Online, and enter this code.
         </p>
 
-        {/* Big code display */}
+        {/* Big code */}
         {roomCode ? (
-          <div className="text-8xl font-bold tracking-[0.3em] text-[var(--pw-accent)] mb-6 font-game select-all">
+          <div className="text-8xl font-bold tracking-[0.4em] text-[var(--pw-accent)] mb-6 select-all">
             {roomCode}
           </div>
         ) : (
-          <div className="text-[var(--pw-text-muted)] mb-6 animate-pulse">Generating code…</div>
+          <div className="text-[var(--pw-text-muted)] animate-pulse mb-6">Generating…</div>
         )}
 
         {/* Copy buttons */}
-        <div className="flex gap-3 mb-8">
+        <div className="flex gap-2 mb-6">
           <Button variant="secondary" onClick={copyCode} className="flex gap-2 items-center">
-            <Copy size={16} />
+            <Copy size={15} />
             {copied ? "✓ Copied!" : "Copy Code"}
           </Button>
           {shareLink && (
-            <Button variant="secondary" onClick={copyLink} className="flex gap-2 items-center">
-              🔗 {copied ? "✓ Copied!" : "Copy Link"}
+            <Button variant="secondary" onClick={copyLink} className="flex gap-2 items-center text-sm">
+              🔗 Copy Link
             </Button>
           )}
         </div>
 
-        {/* Shareable link display */}
+        {/* Shareable URL */}
         {shareLink && (
-          <div className="mb-8 px-4 py-3 bg-[var(--pw-surface)] border border-[var(--pw-border)] rounded-xl text-xs text-[var(--pw-text-muted)] max-w-sm text-center break-all">
-            Or share this link:<br />
-            <span className="font-mono text-[var(--pw-accent)]">{shareLink}</span>
-          </div>
+          <p className="text-xs text-[var(--pw-text-muted)] mb-8 text-center break-all max-w-sm">
+            {shareLink}
+          </p>
         )}
 
-        <ConnectionBadge />
-
-        {/* Status */}
-        <div className="mt-6 mb-8 text-center">
-          {connectionStatus === "connected" ? (
-            <p className="text-green-500 font-semibold">✓ Friend connected!</p>
+        {/* Connection status */}
+        <div className="mb-8 text-center">
+          {guestConnected ? (
+            <div className="flex items-center gap-2 text-green-600 font-semibold">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+              Friend connected! Ready to start.
+            </div>
           ) : (
-            <p className="text-[var(--pw-text-muted)] text-sm animate-pulse">
-              Waiting for friend to join…
-            </p>
+            <div className="flex items-center gap-2 text-[var(--pw-text-muted)]">
+              <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block animate-pulse" />
+              Waiting for your friend to join…
+            </div>
           )}
         </div>
 
         <div className="flex gap-3">
           <Button
-            onClick={handleStartGame}
-            disabled={connectionStatus !== "connected"}
-            className="px-8"
+            onClick={handleHostStart}
+            disabled={!guestConnected}
+            className="px-10 py-3 text-base"
           >
             Start Game →
           </Button>
@@ -235,54 +286,52 @@ export function GameLobby({ initialCode }: Props) {
             Cancel
           </Button>
         </div>
-
-        {error && (
-          <div role="alert" className="mt-4 px-4 py-3 rounded-lg bg-red-900/20 border border-red-500 text-red-400 text-sm text-center max-w-xs">
-            {error}
-          </div>
-        )}
       </div>
     );
   }
 
-  // ── SCREEN: Joining — waiting for connection ─────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────────
+  // SCREEN: Joining — connecting, then waiting for host to start
+  // ────────────────────────────────────────────────────────────────────────────
+  const joinedCode = guestInput || initialCode || "?";
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--pw-bg)]">
-      <h1 className="text-2xl font-bold mb-2">Joining room {guestCode || initialCode}</h1>
-      <p className="text-[var(--pw-text-muted)] text-sm mb-8 text-center max-w-xs">
-        Connecting to your friend&apos;s room…
-      </p>
+      <h1 className="text-2xl font-bold mb-2">Joining room</h1>
 
-      <ConnectionBadge />
+      <div className="text-6xl font-bold tracking-[0.4em] text-[var(--pw-accent)] mb-8">
+        {joinedCode}
+      </div>
 
-      <div className="mt-6 mb-8 text-center">
+      <div className="mb-8 text-center">
         {connectionStatus === "connected" ? (
-          <p className="text-green-500 font-semibold">✓ Connected to host!</p>
+          <div>
+            <div className="flex items-center gap-2 text-green-600 font-semibold mb-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" />
+              Connected!
+            </div>
+            <p className="text-[var(--pw-text-muted)] text-sm animate-pulse">
+              Waiting for the host to start the game…
+            </p>
+          </div>
         ) : connectionStatus === "connecting" ? (
-          <p className="text-[var(--pw-text-muted)] animate-pulse">Connecting…</p>
+          <div className="flex items-center gap-2 text-[var(--pw-text-muted)]">
+            <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block animate-pulse" />
+            Connecting…
+          </div>
         ) : (
-          <p className="text-red-400">Connection failed.</p>
+          <div className="text-red-500">Connection failed.</div>
         )}
       </div>
 
       {error && (
-        <div role="alert" className="mb-6 px-4 py-3 rounded-lg bg-red-900/20 border border-red-500 text-red-400 text-sm text-center max-w-xs">
+        <div role="alert" className="mb-6 px-4 py-3 rounded-lg bg-red-100 border border-red-400 text-red-700 text-sm text-center max-w-xs">
           {error}
         </div>
       )}
 
-      <div className="flex gap-3">
-        <Button
-          onClick={handleStartGame}
-          disabled={connectionStatus !== "connected"}
-          className="px-8"
-        >
-          Start Game →
-        </Button>
-        <Button variant="ghost" onClick={handleBack} className="text-sm">
-          ← Back
-        </Button>
-      </div>
+      <Button variant="ghost" onClick={handleBack} className="text-sm">
+        ← Back
+      </Button>
     </div>
   );
 }

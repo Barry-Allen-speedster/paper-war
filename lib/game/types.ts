@@ -107,5 +107,6 @@ export type GameAction =
   | { type: "END_TURN" }
   | { type: "GAME_OVER"; winner: PlayerId }
   | { type: "SYNC_ERROR" }
+  | { type: "ADVANCE_FROM_LOBBY" }  // online: both connected, move to Setup
   | { type: "REMATCH" }
   | { type: "RETURN_TO_MENU" };

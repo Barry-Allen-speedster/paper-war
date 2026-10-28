@@ -15,14 +15,25 @@ import type { RNG } from "../game/rng";
 const C = DEFAULT_CONFIG;
 
 /**
- * The ideal shot position for a target unit.
+ * The ideal LANDING point for a target unit is just its position.
+ * This is where you WANT the dot to land on the opponent's half.
  *
- * The AI aims on ITS OWN half. BattlefieldScreen.handleFoldComplete
- * then mirrors the X axis (1 - x) before computing the hit.
- * So to land at unit.pos.x on the OPPONENT's half, the AI must aim at
- * (1 - unit.pos.x) on its own half. Y is unchanged (fold preserves Y).
+ * To aim there from your own half, you must aim at the MIRROR:
+ *   aimPos.x = 1 - unit.pos.x  (for landscape / vertical crease)
+ * This mirroring is done in the AI strategies, NOT here.
+ * This function is also used directly in the simulation (no mirroring needed there).
  */
 export function idealShot(unit: Unit): Vec2 {
+  return { x: unit.pos.x, y: unit.pos.y };
+}
+
+/**
+ * Returns the AIM position the AI should use on its OWN half so that,
+ * after the fold-mirror, the dot lands on the target unit.
+ * Landscape (vertical crease): x mirrors; portrait: y mirrors.
+ */
+export function idealAimPos(unit: Unit, isPortrait = false): Vec2 {
+  if (isPortrait) return { x: unit.pos.x, y: 1 - unit.pos.y };
   return { x: 1 - unit.pos.x, y: unit.pos.y };
 }
 

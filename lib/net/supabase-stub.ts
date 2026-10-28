@@ -26,7 +26,7 @@ class NotImplementedError extends Error {
 }
 
 export class SupabaseStub implements Transport {
-  connect(_roomCode: string, _role: "host" | "guest"): Promise<void> {
+  connect(_roomCode: string, _role: "host" | "guest"): Promise<string> {
     throw new NotImplementedError("connect");
   }
 

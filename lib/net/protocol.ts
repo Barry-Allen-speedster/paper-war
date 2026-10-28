@@ -63,6 +63,12 @@ const ForfeitSchema = z.object({
   seq: z.number().int().nonnegative(),
 });
 
+/** Host sends this when they press Start — tells guest to navigate to the game */
+const StartGameMsgSchema = z.object({
+  type: z.literal("startGame"),
+  seq: z.number().int().nonnegative(),
+});
+
 export const NetMessageSchema = z.discriminatedUnion("type", [
   HelloSchema,
   ReadySchema,
@@ -72,6 +78,7 @@ export const NetMessageSchema = z.discriminatedUnion("type", [
   PingSchema,
   PongSchema,
   ForfeitSchema,
+  StartGameMsgSchema,
 ]);
 
 export type NetMessage = z.infer<typeof NetMessageSchema>;

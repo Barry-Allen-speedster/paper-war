@@ -42,8 +42,7 @@ function otherPlayer(id: PlayerId): PlayerId {
 function canTransitionTo(from: GamePhase, to: GamePhase): boolean {
   const allowed: Partial<Record<GamePhase, GamePhase[]>> = {
     MainMenu:    ["Lobby", "Setup"],
-    Lobby:       ["Setup", "MainMenu"],
-    Setup:       ["Aiming"],
+    Lobby:       ["Setup", "MainMenu"],    Setup:       ["Aiming"],
     Aiming:      ["Fired"],
     Fired:       ["Folding"],
     Folding:     ["Pressing"],
@@ -289,6 +288,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
     case "GAME_OVER": {
       return { ...state, phase: "GameOver", winner: action.winner };
+    }
+
+    case "ADVANCE_FROM_LOBBY": {
+      if (state.phase !== "Lobby") return state;
+      return { ...state, phase: "Setup" };
     }
 
     case "SYNC_ERROR": {

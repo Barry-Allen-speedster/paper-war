@@ -11,8 +11,8 @@ export type ConnectionStatus =
   | "reconnecting";
 
 export interface Transport {
-  /** Connect to (or create) a room. Host creates; guest joins. */
-  connect(roomCode: string, role: "host" | "guest"): Promise<void>;
+  /** Connect to (or create) a room. Returns the actual room code used (may differ from requested on collision retry). */
+  connect(roomCode: string, role: "host" | "guest"): Promise<string>;
   /** Send a message to the peer. */
   send(message: NetMessage): void;
   /** Subscribe to incoming messages. Returns an unsubscribe function. */

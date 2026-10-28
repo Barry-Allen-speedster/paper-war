@@ -1,17 +1,16 @@
 /**
  * Hard AI — sees the board, small aim error (sigma=8).
- * Priority: King > Queen > "double-hit soldier" (covers 2+ units).
- * Searches for the shot that maximises overlap count; prefers King even at lower overlap.
+ * Priority: King > Queen > soldier with most overlap.
+ *
+ * idealAimPos(unit) returns the aim position on the AI's own half.
+ * After the fold, that aim mirrors to land on unit.pos on the opponent's half.
  */
-import type { Vec2, Unit } from "../game/types";
+import type { Vec2 } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealShot, applyAimError, countOverlap } from "./aimError";
-import { DEFAULT_CONFIG } from "../game/config";
+import { idealAimPos, applyAimError, countOverlap } from "./aimError";
 
-const C = DEFAULT_CONFIG;
 const HARD_SIGMA = 8;
-/** Number of candidate positions to sample when searching for max overlap */
-const SEARCH_SAMPLES = 40;
+const SEARCH_SAMPLES = 30;
 
 export class HardAI implements AIStrategy {
   chooseShot(view: AIView): Vec2 {
@@ -21,30 +20,31 @@ export class HardAI implements AIStrategy {
       return { x: rng.next(), y: rng.next() };
     }
 
-    // 1. Always try the King first if alive
+    // Always go for the King first
     const king = visibleEnemyUnits.find((u) => u.type === "king");
     if (king) {
-      return applyAimError(idealShot(king), HARD_SIGMA, rng);
+      return applyAimError(idealAimPos(king), HARD_SIGMA, rng);
     }
 
-    // 2. Try Queen
+    // Then Queen
     const queen = visibleEnemyUnits.find((u) => u.type === "queen");
+    if (queen) {
+      return applyAimError(idealAimPos(queen), HARD_SIGMA, rng);
+    }
 
-    // 3. Find best overlap shot among all alive units
-    let bestPos: Vec2 = idealShot(visibleEnemyUnits[0]!);
+    // Find the aim position that hits the most units
+    let bestPos: Vec2 = idealAimPos(visibleEnemyUnits[0]!);
     let bestOverlap = 0;
 
     for (const unit of visibleEnemyUnits) {
-      const ideal = idealShot(unit);
-      // Sample around ideal position to find best overlap
+      const aim = idealAimPos(unit);
       for (let i = 0; i < SEARCH_SAMPLES; i++) {
-        const sigma = i === 0 ? 0 : HARD_SIGMA * 2; // First try exact, then jitter
-        const candidate = i === 0 ? ideal : applyAimError(ideal, sigma, rng);
-        const overlap = countOverlap(candidate, visibleEnemyUnits);
-
-        // Prefer queen even at equal overlap
-        const isQueenTarget = queen && unit.type === "queen";
-        if (overlap > bestOverlap || (overlap === bestOverlap && isQueenTarget)) {
+        const candidate = i === 0 ? aim : applyAimError(aim, HARD_SIGMA * 2, rng);
+        // The candidate aims at (candidate.x, candidate.y) on own half.
+        // After fold mirror, it lands at (1 - candidate.x, candidate.y) on opponent half.
+        const landingPos = { x: 1 - candidate.x, y: candidate.y };
+        const overlap = countOverlap(landingPos, visibleEnemyUnits);
+        if (overlap > bestOverlap) {
           bestOverlap = overlap;
           bestPos = candidate;
         }

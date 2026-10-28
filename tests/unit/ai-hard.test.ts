@@ -31,16 +31,17 @@ describe("HardAI", () => {
     expect(pos.y).toBeLessThanOrEqual(1);
   });
 
-  it("targets King first when King is alive", () => {
+  it("targets King first when King is alive (aim mirrors king position)", () => {
     const ai = new HardAI();
     const king    = makeUnit("king",    0.8, 0.8, "king");
     const soldier = makeUnit("soldier", 0.2, 0.2, "s1");
     const view = { ...makeView([soldier, king]), rng: createRNG(1) };
 
-    // With sigma=8 (0.008 normalized), shot should be very close to king's pos (0.8, 0.8)
+    // King is at x=0.8. After fold mirror, AI must aim at x = 1 - 0.8 = 0.2
+    // With sigma=8 (≈0.008 normalized), shot should be very close to (0.2, 0.8)
     const pos = ai.chooseShot(view);
-    const dist = Math.hypot(pos.x - 0.8, pos.y - 0.8);
-    expect(dist).toBeLessThan(0.05); // within 5% of king
+    const dist = Math.hypot(pos.x - 0.2, pos.y - 0.8);
+    expect(dist).toBeLessThan(0.05);
   });
 
   it("fallback to random when no enemy units", () => {

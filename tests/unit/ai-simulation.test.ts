@@ -49,8 +49,10 @@ function simulateGame(
       rng: createRNG(attackerSeed + turn * 3 + 7),
     };
     const aPos = attackerStrategy.chooseShot(attackerView);
-    const aComputed = computeShotResult(aPos, defenderPlayer, RULES);
-    const aShot = buildShot(aPos, "p1", turn, aComputed);
+    // AI aims on own half — mirror X to get landing position on opponent's half
+    const aLanding = { x: 1 - aPos.x, y: aPos.y };
+    const aComputed = computeShotResult(aLanding, defenderPlayer, RULES);
+    const aShot = buildShot(aLanding, "p1", turn, aComputed);
     attackerShots.push(aShot);
     defenderPlayer = applyShot(aComputed, aShot, defenderPlayer, RULES);
     if (checkWinCondition(defenderPlayer, "p1", RULES)) return "attacker";
@@ -64,8 +66,9 @@ function simulateGame(
       rng: createRNG(defenderSeed + turn * 7 + 3),
     };
     const dPos = defenderStrategy.chooseShot(defenderView);
-    const dComputed = computeShotResult(dPos, attackerPlayer, RULES);
-    const dShot = buildShot(dPos, "p2", turn, dComputed);
+    const dLanding = { x: 1 - dPos.x, y: dPos.y };
+    const dComputed = computeShotResult(dLanding, attackerPlayer, RULES);
+    const dShot = buildShot(dLanding, "p2", turn, dComputed);
     defenderShots.push(dShot);
     attackerPlayer = applyShot(dComputed, dShot, attackerPlayer, RULES);
     if (checkWinCondition(attackerPlayer, "p2", RULES)) return "defender";

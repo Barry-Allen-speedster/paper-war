@@ -4,7 +4,7 @@
  */
 import type { Vec2 } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealShot, applyAimError } from "./aimError";
+import { idealAimPos, applyAimError } from "./aimError";
 import { DEFAULT_CONFIG } from "../game/config";
 
 const C = DEFAULT_CONFIG;
@@ -22,7 +22,7 @@ export class EasyAI implements AIStrategy {
 
     // Pick a random alive unit
     const target = visibleEnemyUnits[rng.nextInt(0, visibleEnemyUnits.length - 1)]!;
-    const ideal = idealShot(target);
-    return applyAimError(ideal, EASY_SIGMA, rng);
+    const aim = idealAimPos(target);
+    return applyAimError(aim, EASY_SIGMA, rng);
   }
 }

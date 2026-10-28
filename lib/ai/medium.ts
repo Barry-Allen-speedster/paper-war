@@ -5,7 +5,7 @@
  */
 import type { Vec2, Unit } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealShot, applyAimError, refDist } from "./aimError";
+import { idealAimPos, applyAimError, refDist } from "./aimError";
 
 const MEDIUM_SIGMA = 30;
 
@@ -52,7 +52,7 @@ export class MediumAI implements AIStrategy {
       const sorted = [...candidates].sort((a, b) => a.pos.y - b.pos.y);
       const target: Unit = sorted[0]!;
 
-      basePos = idealShot(target);
+      basePos = idealAimPos(target);
       this.lastTarget = basePos;
     }
 
