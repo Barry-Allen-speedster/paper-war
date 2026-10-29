@@ -105,6 +105,7 @@ export type GameAction =
   | { type: "RANDOMIZE_PLACEMENT"; playerId: PlayerId }
   | { type: "RESET_PLACEMENT"; playerId: PlayerId }
   | { type: "LOCK_LAYOUT"; playerId: PlayerId }
+  | { type: "SYNC_REMOTE_LAYOUT"; playerId: PlayerId; units: Unit[] }
   | { type: "AIM"; pos: Vec2 }
   | { type: "FIRE" }
   | { type: "ANIMATION_FOLDING_START" }

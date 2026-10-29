@@ -13,9 +13,7 @@ import { ErrorBoundary } from "@components/ui/ErrorBoundary";
 import { ToastProvider } from "@components/ui/Toast";
 import { Button } from "@components/ui/Button";
 import { t } from "@lib/i18n";
-import { computeStateHash } from "@lib/net/protocol";
 import { DEFAULT_CONFIG } from "@lib/game/config";
-import { buildShot, computeShotResult } from "@lib/game/rules";
 
 const C = DEFAULT_CONFIG;
 
@@ -46,14 +44,14 @@ function OnlineGameInner() {
     if (phase === "Setup") setMyDeployed(false);
   }, [phase]);
 
-  // ── Poll: keep re-sending "ready" every 1.5 s while waiting for opponent ───
-  // Uses incrementing seq so PeerJS dedup doesn't filter repeats as duplicates.
-  const readySeqRef = useRef(10);
+  // ── Poll: keep re-sending "ready" while waiting for opponent ──────────────
+  // Repeat deployment details so a player who subscribes slightly later still
+  // receives the opponent's army and ready state.
   useEffect(() => {
     if (!transport || !myDeployed || phase !== "Setup") return;
     const send = () => {
-      readySeqRef.current += 1;
-      transport.send({ type: "ready", skinId: "notebook", inkColor: "#333", seq: readySeqRef.current });
+      const ownArmy = gameStateRef.current.players[myPlayerId === "p1" ? 0 : 1]!.units;
+      transport.send({ type: "ready", skinId: "notebook", inkColor: "#333", layout: ownArmy, seq: 0 });
     };
     send();
     const id = setInterval(send, 1500);
@@ -64,72 +62,23 @@ function OnlineGameInner() {
   useEffect(() => {
     if (!transport) return;
 
-    const unsub = transport.onMessage(async (msg) => {
-      const state = gameStateRef.current;
-
+    const unsub = transport.onMessage((msg) => {
       switch (msg.type) {
-
-        case "hello":
-          // Guest just connected — no-op here, lobby handles it
-          break;
-
         case "startGame":
           // Host told guest to advance from Lobby → Setup
           dispatch({ type: "ADVANCE_FROM_LOBBY" });
           break;
 
         case "ready": {
-          // Opponent finished deploying.
-          // Lock their layout in OUR local state so the reducer sees both
-          // players locked and automatically transitions to Aiming.
-          dispatch({ type: "LOCK_LAYOUT", playerId: oppPlayerId });
+          dispatch({ type: "SYNC_REMOTE_LAYOUT", playerId: oppPlayerId, units: msg.layout });
           break;
         }
 
         case "shot": {
-          // Opponent fired at us. Mirror the shot position (fold mechanic).
-          const isPortrait =
-            typeof window !== "undefined" &&
-            window.innerHeight > window.innerWidth;
-          const mirroredPos = isPortrait
-            ? { x: msg.pos.x, y: 1 - msg.pos.y }
-            : { x: 1 - msg.pos.x, y: msg.pos.y };
-
-          const myIdx = myPlayerId === "p1" ? 0 : 1;
-          const defender = state.players[myIdx]!;
-          const computed = computeShotResult(mirroredPos, defender, state.config.rules);
-          const shot = buildShot(mirroredPos, oppPlayerId, state.turn, computed);
-
-          // Drive animation then resolve
-          dispatch({ type: "ANIMATION_FOLDING_START" });
-          setTimeout(() => {
-            dispatch({ type: "ANIMATION_FOLDING_COMPLETE" });
-            dispatch({ type: "ANIMATION_PRESSING_COMPLETE" });
-            dispatch({ type: "ANIMATION_UNFOLDING_COMPLETE" });
-            dispatch({ type: "RESOLVE_SHOT", shot });
-            dispatch({ type: "END_TURN" });
-          }, C.ANIM_TOTAL_MS);
-
-          // Consistency check
-          const allShots = [
-            ...state.players[0]!.shots,
-            ...state.players[1]!.shots,
-            shot,
-          ];
-          const hash = await computeStateHash(allShots);
-          transport.send({ type: "stateHash", seq: msg.seq + 1, hash });
-          break;
-        }
-
-        case "stateHash": {
-          const allShots = [
-            ...state.players[0]!.shots,
-            ...state.players[1]!.shots,
-          ];
-          if (allShots.length > 0) {
-            const myHash = await computeStateHash(allShots);
-            if (myHash !== msg.hash) setSyncError(true);
-          }
+          // Drive the same aiming/fold flow on both clients. Each client has
+          // both layouts from the ready exchange and resolves the same shot.
+          dispatch({ type: "AIM", pos: msg.pos });
+          dispatch({ type: "FIRE" });
           break;
         }
 
@@ -187,7 +136,11 @@ function OnlineGameInner() {
         onReady={() => {
           setMyDeployed(true);
           dispatch({ type: "LOCK_LAYOUT", playerId: myPlayerId });
-          // ready polling effect will broadcast to opponent
+          // Send immediately: if the other player is already ready, this
+          // action can advance straight to Aiming before the polling effect
+          // gets a chance to run.
+          const ownArmy = gameStateRef.current.players[myPlayerId === "p1" ? 0 : 1]!.units;
+          transport?.send({ type: "ready", skinId: "notebook", inkColor: "#333", layout: ownArmy, seq: 0 });
         }}
       />
     );

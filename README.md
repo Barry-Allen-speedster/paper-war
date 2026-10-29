@@ -41,7 +41,7 @@ spec/         requirements.md, design.md, tasks.md (full spec)
 - **Normalized coordinates**: All unit/shot positions are `Vec2` in `[0,1]` relative to each player's half. Pixel conversion happens only at render time. Hit detection and AI run in a 1000×1000 reference space.
 - **Pure `/lib`**: All game logic (`reducer`, `rules`, `placement`, `geometry`, AI) has zero framework dependencies and is unit-testable with Vitest in Node.
 - **Single config file**: Every magic number (radii, margins, timeouts, army size) lives in `lib/game/config.ts`. No constants anywhere else.
-- **Swappable transport**: Online play uses PeerJS behind a `Transport` interface. Swap without touching game logic.
+- **Swappable transport**: Online play uses Supabase Realtime behind a `Transport` interface. Swap without touching game logic.
 
 ## How to Add a Theme
 
@@ -57,20 +57,18 @@ spec/         requirements.md, design.md, tasks.md (full spec)
 5. Add theme-specific CSS animations to `styles/globals.css` if needed.
 6. Run `npm run test` — the theme-completeness test will verify all fields are present.
 
-## How to Swap the Network Transport
+## Online Multiplayer Setup
 
-The `Transport` interface (`lib/net/transport.ts`) requires 5 methods: `connect`, `send`, `onMessage`, `onStatus`, `disconnect`.
+Online rooms use Supabase Realtime Broadcast as a relay, so players do not need a direct browser-to-browser WebRTC connection. Create a Supabase project, then set these environment variables in the deployment environment:
 
-1. Create a class implementing `Transport` in `lib/net/`.
-2. In `hooks/useNetStore.ts`, replace `new PeerJSTransport()` with your implementation.
-3. See `lib/net/supabase-stub.ts` for the Supabase Realtime implementation guide (10 lines of code).
+```text
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
+```
 
-## Vercel Deploy
+In Vercel, open the project, go to **Settings → Environment Variables**, add both variables, select **Production**, **Preview**, and **Development** for each, save, then redeploy the latest deployment. Get the URL and publishable key from the Supabase project's **Connect** dialog or **Project Settings → API Keys**. Never use the `service_role` or secret key in a browser environment.
 
-1. Push to a GitHub repo.
-2. Import into Vercel — no configuration needed (Next.js auto-detected).
-3. No environment variables required for core play (PeerJS uses their cloud for signaling).
-4. For custom PeerJS server: set `NEXT_PUBLIC_PEER_HOST`, `NEXT_PUBLIC_PEER_PORT`, `NEXT_PUBLIC_PEER_PATH` and update `lib/net/peerjs.ts` to use them.
+For local development, copy `.env.example` to `.env.local`, fill in the same two values, and restart `npm run dev`.
 
 ## Game Rules (Defaults)
 

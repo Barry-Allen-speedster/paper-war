@@ -14,14 +14,15 @@
     "test:ui": "vitest --ui"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
+    "framer-motion": "^11.3.19",
+    "lucide-react": "^0.414.0",
     "next": "14.2.5",
+    "peerjs": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "framer-motion": "^11.3.19",
-    "zustand": "^4.5.4",
     "zod": "^3.23.8",
-    "lucide-react": "^0.414.0",
-    "peerjs": "^1.5.4"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@playwright/test": "^1.45.3",

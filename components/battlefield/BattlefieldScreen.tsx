@@ -24,6 +24,7 @@ import { FoldAnimationLayer } from "./FoldAnimationLayer";
 import { ShotLogDrawer } from "./ShotLogDrawer";
 import { getAudioService } from "@lib/audio/audioService";
 import { useSettingsStore } from "@hooks/useSettingsStore";
+import { useNetStore } from "@hooks/useNetStore";
 import type { Shot } from "@lib/game/types";
 
 const C = DEFAULT_CONFIG;
@@ -36,6 +37,7 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
   const { gameState, dispatch } = useGameStore();
   const theme = useTheme();
   const soundEnabled = useSettingsStore((s) => s.soundEnabled);
+  const transport = useNetStore((s) => s.transport);
   const [boardRef, boardSize] = useResizeObserver<HTMLDivElement>();
 
   // Refs for fold animation — one per half
@@ -169,6 +171,14 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
 
   function handleFire() {
     if (!isAiming) return;
+    if (config.mode === "online") {
+      transport?.send({
+        type: "shot",
+        pos: aimingPos,
+        shotId: `${currentPlayerId}-${turn}-${p1.shots.length + p2.shots.length}`,
+        seq: 0,
+      });
+    }
     // Init audio and play fire sound on first gesture
     const audio = getAudioService();
     audio.init();

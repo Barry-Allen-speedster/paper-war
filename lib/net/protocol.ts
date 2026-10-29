@@ -22,6 +22,13 @@ const ReadySchema = z.object({
   type: z.literal("ready"),
   skinId: z.string(),
   inkColor: z.string(),
+  layout: z.array(z.object({
+    id: z.string(),
+    type: z.enum(["soldier", "queen", "king"]),
+    pos: Vec2Schema,
+    alive: z.boolean(),
+    hitsRemaining: z.number().int().nonnegative(),
+  })),
   seq: z.number().int().nonnegative(),
 });
 

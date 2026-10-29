@@ -4,8 +4,8 @@
  *
  * Flow:
  *   Both players land here from /play/online (phase === "Lobby").
- *   Host: creates a PeerJS peer, waits for guest to connect, then clicks Start.
- *   Guest: enters the 4-digit code, connects to host, waits for host to start.
+ *   Host: creates a Supabase Realtime room, waits for guest to join, then clicks Start.
+ *   Guest: enters the 6-digit code, connects to host, waits for host to start.
  *
  * When the host clicks Start:
  *   1. Host dispatches ADVANCE_FROM_LOBBY → phase becomes Setup.
@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNetStore } from "@hooks/useNetStore";
 import { useGameStore } from "@hooks/useGameStore";
-import { PeerJSTransport } from "@lib/net/peerjs";
+import { SupabaseTransport } from "@lib/net/supabase";
 import { Button } from "@components/ui/Button";
 import { Copy } from "lucide-react";
 
@@ -36,31 +36,12 @@ export function GameLobby({ initialCode }: Props) {
   const [guestInput, setGuestInput] = useState(initialCode ?? "");
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const transportRef = useRef<PeerJSTransport | null>(null);
+  const transportRef = useRef<SupabaseTransport | null>(null);
 
   const shareLink =
     typeof window !== "undefined" && roomCode
       ? `${window.location.origin}/join/${roomCode}`
       : "";
-
-  // ── Listen for messages from peer ───────────────────────────────────────────
-  useEffect(() => {
-    const transport = transportRef.current;
-    if (!transport) return;
-
-    const unsub = transport.onMessage((msg) => {
-      if (msg.type === "hello") {
-        // Guest connected — host already got status "connected" via PeerJS event
-        // Nothing extra needed; UI reacts to connectionStatus
-      }
-      if (msg.type === "startGame") {
-        // Guest receives this from host → advance to Setup
-        dispatch({ type: "ADVANCE_FROM_LOBBY" });
-      }
-    });
-
-    return unsub;
-  });
 
   // Cleanup transport on unmount
   useEffect(() => {
@@ -73,8 +54,8 @@ export function GameLobby({ initialCode }: Props) {
   // ── Host ─────────────────────────────────────────────────────────────────────
   async function startAsHost() {
     setError(null);
-    const code = String(Math.floor(1000 + Math.random() * 9000));
-    const transport = new PeerJSTransport();
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const transport = new SupabaseTransport();
     transportRef.current = transport;
 
     transport.onStatus((s) => {
@@ -88,18 +69,25 @@ export function GameLobby({ initialCode }: Props) {
       setPeerRole("host");
       setScreen("hosting");
     } catch (err) {
-      setError("Could not create room. Check your internet connection.");
+      const message = err instanceof Error ? err.message : "Unknown error";
+      setError(`Could not create room: ${message}`);
       console.error(err);
     }
   }
 
   // ── Guest ────────────────────────────────────────────────────────────────────
   async function joinAsGuest(code: string) {
-    if (code.length !== 4) return;
+    if (code.length !== 6) return;
     setError(null);
 
-    const transport = new PeerJSTransport();
+    const transport = new SupabaseTransport();
     transportRef.current = transport;
+
+    // Register before joining so an immediate host start cannot beat the
+    // lobby's React effect subscription.
+    transport.onMessage((msg) => {
+      if (msg.type === "startGame") dispatch({ type: "ADVANCE_FROM_LOBBY" });
+    });
 
     transport.onStatus((s) => setConnectionStatus(s));
 
@@ -185,14 +173,14 @@ export function GameLobby({ initialCode }: Props) {
           <input
             type="text"
             inputMode="numeric"
-            maxLength={4}
+          maxLength={6}
             value={guestInput}
             onChange={(e) => setGuestInput(e.target.value.replace(/\D/g, ""))}
             placeholder="1 2 3 4"
             autoFocus
             className="w-full text-center text-5xl font-bold tracking-[0.5em] border-2 border-[var(--pw-border)] rounded-xl p-4 bg-[var(--pw-surface)] focus:border-[var(--pw-accent)] outline-none"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && guestInput.length === 4) {
+              if (e.key === "Enter" && guestInput.length === 6) {
                 setScreen("joining");
                 void joinAsGuest(guestInput);
               }
@@ -200,7 +188,7 @@ export function GameLobby({ initialCode }: Props) {
           />
           <Button
             onClick={() => { setScreen("joining"); void joinAsGuest(guestInput); }}
-            disabled={guestInput.length !== 4}
+            disabled={guestInput.length !== 6}
             variant="secondary"
             className="w-full py-4 text-lg"
           >
@@ -232,7 +220,7 @@ export function GameLobby({ initialCode }: Props) {
 
         {/* Big code */}
         {roomCode ? (
-          <div className="text-8xl font-bold tracking-[0.4em] text-[var(--pw-accent)] mb-6 select-all">
+          <div className="text-6xl font-bold tracking-[0.25em] text-[var(--pw-accent)] mb-6 select-all">
             {roomCode}
           </div>
         ) : (
@@ -298,7 +286,7 @@ export function GameLobby({ initialCode }: Props) {
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[var(--pw-bg)]">
       <h1 className="text-2xl font-bold mb-2">Joining room</h1>
 
-      <div className="text-6xl font-bold tracking-[0.4em] text-[var(--pw-accent)] mb-8">
+      <div className="text-6xl font-bold tracking-[0.25em] text-[var(--pw-accent)] mb-8">
         {joinedCode}
       </div>
 

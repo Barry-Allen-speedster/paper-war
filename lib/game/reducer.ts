@@ -168,6 +168,30 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return nextState;
     }
 
+    case "SYNC_REMOTE_LAYOUT": {
+      if (state.phase !== "Setup") return state;
+      const player = getPlayer(state, action.playerId);
+      if (player.layoutLocked) return state;
+      const nextState = setPlayer(state, {
+        ...player,
+        units: action.units,
+        layoutLocked: true,
+        isReady: true,
+      });
+      const p1 = getPlayer(nextState, "p1");
+      const p2 = getPlayer(nextState, "p2");
+      if (p1.layoutLocked && p2.layoutLocked) {
+        return {
+          ...nextState,
+          phase: "Aiming",
+          currentPlayerId: "p1",
+          turn: 1,
+          shotsRemainingInTurn: nextState.config.rules.shotsPerTurn,
+        };
+      }
+      return nextState;
+    }
+
     case "AIM": {
       if (state.phase !== "Aiming") return state;
       return { ...state, aimingPos: clamp01(action.pos) };
