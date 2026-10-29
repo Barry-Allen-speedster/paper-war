@@ -1,63 +1,85 @@
 /**
- * Medium AI — sees the board, moderate aim error (sigma=30).
- * Prefers units it hasn't hit yet; targets nearest to own crease first.
- * After a miss, applies a correction offset toward the target (converges in ~2-3 turns).
+ * Medium AI — rule-aware target selection, miss-correction, sigma=28.
+ *
+ * Priority adapts to active rules:
+ *   allUnitsWin OFF → King first, then Queen (for queenKillSkipsTurn bonus), then soldiers
+ *   allUnitsWin ON  → Clear soldiers first (easy kills), then Queen, then King
+ *   queenKillSkipsTurn → Queen jumps to second priority even in normal mode
  */
 import type { Vec2, Unit } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealAimPos, applyAimError, refDist } from "./aimError";
+import { idealAimPos, applyAimError } from "./aimError";
 
-const MEDIUM_SIGMA = 30;
+const MEDIUM_SIGMA = 28;
 
 export class MediumAI implements AIStrategy {
-  /** Last intended target position (for correction after miss) */
   private lastTarget: Vec2 | null = null;
-  /** Last actual shot position (for computing correction offset) */
   private lastShot: Vec2 | null = null;
+  private lastTargetUnit: Unit | null = null;
 
   chooseShot(view: AIView): Vec2 {
-    const { visibleEnemyUnits, shotHistory, rng } = view;
+    const { visibleEnemyUnits, shotHistory, rng, config } = view;
+    const rules = config.rules;
 
-    if (visibleEnemyUnits.length === 0) {
-      return { x: rng.next(), y: rng.next() };
-    }
+    if (visibleEnemyUnits.length === 0) return { x: rng.next(), y: rng.next() };
 
-    // Check last shot for correction opportunity
-    const lastShotRecord = shotHistory[shotHistory.length - 1];
-    const shouldCorrect =
-      lastShotRecord &&
-      lastShotRecord.result === "miss" &&
-      this.lastTarget !== null &&
-      this.lastShot !== null;
+    const lastShot = shotHistory[shotHistory.length - 1];
 
-    let basePos: Vec2;
-
-    if (shouldCorrect && this.lastTarget && this.lastShot) {
-      // Correction: shift toward target using the miss offset
+    // Miss-correction: if last shot missed the current target, nudge toward it
+    if (
+      lastShot?.result === "miss" &&
+      this.lastTarget &&
+      this.lastShot &&
+      this.lastTargetUnit &&
+      visibleEnemyUnits.some((u) => u.id === this.lastTargetUnit!.id)
+    ) {
       const errX = this.lastShot.x - this.lastTarget.x;
       const errY = this.lastShot.y - this.lastTarget.y;
-      // Apply ~70% correction with some noise
-      basePos = {
-        x: Math.max(0.01, Math.min(0.99, this.lastTarget.x - errX * 0.7)),
-        y: Math.max(0.01, Math.min(0.99, this.lastTarget.y - errY * 0.7)),
+      const corrected = {
+        x: Math.max(0.01, Math.min(0.99, this.lastTarget.x - errX * 0.75)),
+        y: Math.max(0.01, Math.min(0.99, this.lastTarget.y - errY * 0.75)),
       };
-    } else {
-      // Pick target: prefer units not yet hit, nearest to own crease (y≈0)
-      const unhit = visibleEnemyUnits.filter((u) =>
-        !shotHistory.some((s) => s.hitUnitId === u.id)
-      );
-      const candidates = unhit.length > 0 ? unhit : visibleEnemyUnits;
-
-      // Sort by distance to crease (y=0 in normalized space)
-      const sorted = [...candidates].sort((a, b) => a.pos.y - b.pos.y);
-      const target: Unit = sorted[0]!;
-
-      basePos = idealAimPos(target);
-      this.lastTarget = basePos;
+      const shot = applyAimError(corrected, MEDIUM_SIGMA * 0.7, rng);
+      this.lastShot = shot;
+      return shot;
     }
 
-    const shot = applyAimError(basePos, MEDIUM_SIGMA, rng);
+    // Pick target based on active rules
+    const target = this.pickTarget(visibleEnemyUnits, shotHistory, rules);
+    const aim = idealAimPos(target);
+    this.lastTarget = aim;
+    this.lastTargetUnit = target;
+    const shot = applyAimError(aim, MEDIUM_SIGMA, rng);
     this.lastShot = shot;
     return shot;
+  }
+
+  private pickTarget(
+    units: Unit[],
+    shots: import("../game/types").Shot[],
+    rules: import("../game/types").RuleConfig
+  ): Unit {
+    const king = units.find((u) => u.type === "king");
+    const queen = units.find((u) => u.type === "queen");
+    const soldiers = units.filter((u) => u.type === "soldier");
+
+    if (rules.allUnitsWin) {
+      // Must kill everything — pick easiest (most-hit soldiers first, then queen, then king)
+      // Among soldiers, prefer the one with fewest hitsRemaining (nearest to death)
+      if (soldiers.length > 0) {
+        return soldiers.sort((a, b) => a.hitsRemaining - b.hitsRemaining)[0]!;
+      }
+      if (queen) return queen;
+      if (king) return king;
+    } else {
+      // Default: King is the win condition — go for it
+      if (king) return king;
+      // If king not visible (shouldn't happen with open info), target queen
+      if (queen && rules.queenKillSkipsTurn) return queen;
+      if (queen) return queen;
+    }
+
+    // Fallback: any unit
+    return units[0]!;
   }
 }

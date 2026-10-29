@@ -159,13 +159,19 @@ export function UnitDeployment({ playerId, onReady }: Props) {
   return (
     <div className="flex flex-col h-screen bg-[var(--pw-bg)] select-none">
       {/* Header */}
-      <div className="p-3 text-center border-b border-[var(--pw-border)] bg-[var(--pw-surface)]">
-        <h2 className="text-lg font-bold">
-          {playerLabel} — {t("deploy.title")}
-        </h2>
-        <p className="text-xs text-[var(--pw-text-muted)] mt-0.5">
-          Tap a unit below, then tap the paper to place it
-        </p>
+      <div className="p-3 border-b border-[var(--pw-border)] bg-[var(--pw-surface)] flex items-center justify-between">
+        <button
+          onClick={() => { dispatch({ type: "RETURN_TO_MENU" }); }}
+          className="text-sm text-[var(--pw-text-muted)] hover:text-[var(--pw-text)] transition-colors px-2 py-1"
+          aria-label="Back to menu"
+        >
+          ← Menu
+        </button>
+        <div className="text-center">
+          <h2 className="text-lg font-bold">{playerLabel} — {t("deploy.title")}</h2>
+          <p className="text-xs text-[var(--pw-text-muted)]">Tap a unit below, then tap the paper to place it</p>
+        </div>
+        <div className="w-16" />
       </div>
 
       {/* Paper / Board area */}

@@ -47,12 +47,15 @@ function OnlineGameInner() {
   }, [phase]);
 
   // ── Poll: keep re-sending "ready" every 1.5 s while waiting for opponent ───
-  // This ensures the opponent receives it even if they connected after we tapped Ready.
+  // Uses incrementing seq so PeerJS dedup doesn't filter repeats as duplicates.
+  const readySeqRef = useRef(10);
   useEffect(() => {
     if (!transport || !myDeployed || phase !== "Setup") return;
-    const send = () =>
-      transport.send({ type: "ready", skinId: "notebook", inkColor: "#333", seq: 1 });
-    send(); // send immediately
+    const send = () => {
+      readySeqRef.current += 1;
+      transport.send({ type: "ready", skinId: "notebook", inkColor: "#333", seq: readySeqRef.current });
+    };
+    send();
     const id = setInterval(send, 1500);
     return () => clearInterval(id);
   }, [transport, myDeployed, phase]);
@@ -208,6 +211,13 @@ function OnlineGameInner() {
             />
           ))}
         </div>
+        <Button
+          variant="ghost"
+          onClick={() => { dispatch({ type: "RETURN_TO_MENU" }); router.push("/"); }}
+          className="mt-8 text-sm text-[var(--pw-text-muted)]"
+        >
+          ← Back to Menu
+        </Button>
       </div>
     );
   }
