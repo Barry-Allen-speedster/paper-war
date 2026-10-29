@@ -163,7 +163,13 @@ export class PeerJSTransport implements Transport {
       console.warn("[PeerJS] Cannot send: connection not open");
       return;
     }
-    this.conn.send(serializeNetMessage(message));
+    // Sequence numbers belong to the transport, not individual call sites.
+    // Several callers (lobby, ready polling, and request/response handlers)
+    // previously maintained independent counters. Since incoming messages are
+    // deduplicated by seq, those counters could collide and make valid messages
+    // such as `ready` or `startGame` disappear on the other client.
+    const sequenced = { ...message, seq: this.nextSeq() } as NetMessage;
+    this.conn.send(serializeNetMessage(sequenced));
   }
 
   onMessage(handler: MessageHandler): () => void {
