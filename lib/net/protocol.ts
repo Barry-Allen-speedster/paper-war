@@ -5,6 +5,7 @@
  * A stateHash message provides cheap consistency checking.
  */
 import { z } from "zod";
+import type { RuleConfig } from "../game/types";
 
 const Vec2Schema = z.object({
   x: z.number().min(0).max(1),
@@ -73,6 +74,16 @@ const ForfeitSchema = z.object({
 /** Host sends this when they press Start — tells guest to navigate to the game */
 const StartGameMsgSchema = z.object({
   type: z.literal("startGame"),
+  seed: z.number().int(),
+  rules: z.object({
+    shotsPerTurn: z.number().int().min(1).max(3),
+    queenTakesTwo: z.boolean(),
+    queenKillSkipsTurn: z.boolean(),
+    allUnitsWin: z.boolean(),
+    showUnitsAfterReady: z.boolean(),
+    kingTakesFour: z.boolean(),
+    streakRevive: z.boolean(),
+  }),
   seq: z.number().int().nonnegative(),
 });
 
@@ -89,6 +100,7 @@ export const NetMessageSchema = z.discriminatedUnion("type", [
 ]);
 
 export type NetMessage = z.infer<typeof NetMessageSchema>;
+export type OnlineStartConfig = { seed: number; rules: RuleConfig };
 
 export function parseNetMessage(raw: unknown): NetMessage {
   return NetMessageSchema.parse(raw);

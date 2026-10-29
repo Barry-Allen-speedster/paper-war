@@ -117,6 +117,7 @@ export type GameAction =
   | { type: "GAME_OVER"; winner: PlayerId }
   | { type: "SYNC_ERROR" }
   | { type: "ADVANCE_FROM_LOBBY" }
+  | { type: "SYNC_ONLINE_CONFIG"; seed: number; rules: RuleConfig }
   | { type: "REVIVE_SOLDIER"; playerId: PlayerId; unitId: string }
   | { type: "REMATCH" }
   | { type: "RETURN_TO_MENU" };

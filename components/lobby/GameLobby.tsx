@@ -30,7 +30,7 @@ type Screen = "pick" | "hosting" | "joining";
 export function GameLobby({ initialCode }: Props) {
   const { setTransport, setConnectionStatus, setRoomCode, setPeerRole, reset, roomCode, connectionStatus } =
     useNetStore();
-  const { dispatch } = useGameStore();
+  const { dispatch, gameState } = useGameStore();
 
   const [screen, setScreen] = useState<Screen>(initialCode ? "joining" : "pick");
   const [guestInput, setGuestInput] = useState(initialCode ?? "");
@@ -86,7 +86,10 @@ export function GameLobby({ initialCode }: Props) {
     // Register before joining so an immediate host start cannot beat the
     // lobby's React effect subscription.
     transport.onMessage((msg) => {
-      if (msg.type === "startGame") dispatch({ type: "ADVANCE_FROM_LOBBY" });
+      if (msg.type === "startGame") {
+        dispatch({ type: "SYNC_ONLINE_CONFIG", seed: msg.seed, rules: msg.rules });
+        dispatch({ type: "ADVANCE_FROM_LOBBY" });
+      }
     });
 
     transport.onStatus((s) => setConnectionStatus(s));
@@ -115,7 +118,12 @@ export function GameLobby({ initialCode }: Props) {
     const transport = transportRef.current;
     if (!transport) return;
     // Tell guest to start
-    transport.send({ type: "startGame", seq: 1 });
+    transport.send({
+      type: "startGame",
+      seed: gameState.config.seed,
+      rules: gameState.config.rules,
+      seq: 1,
+    });
     // Host advances locally
     dispatch({ type: "ADVANCE_FROM_LOBBY" });
   }

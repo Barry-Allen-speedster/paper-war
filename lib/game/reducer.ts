@@ -354,6 +354,21 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, phase: "Setup" };
     }
 
+    case "SYNC_ONLINE_CONFIG": {
+      if (state.phase !== "Lobby" || state.config.mode !== "online") return state;
+      const rules = { ...action.rules };
+      const players = state.players.map((player) => ({
+        ...player,
+        units: applyRulesToArmy(player.units, rules),
+      })) as [PlayerState, PlayerState];
+      return {
+        ...state,
+        config: { ...state.config, seed: action.seed, rules },
+        players,
+        shotsRemainingInTurn: rules.shotsPerTurn,
+      };
+    }
+
     case "SYNC_ERROR": {
       return { ...state, syncError: true };
     }

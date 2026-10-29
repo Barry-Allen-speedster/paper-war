@@ -66,6 +66,7 @@ function OnlineGameInner() {
       switch (msg.type) {
         case "startGame":
           // Host told guest to advance from Lobby → Setup
+          dispatch({ type: "SYNC_ONLINE_CONFIG", seed: msg.seed, rules: msg.rules });
           dispatch({ type: "ADVANCE_FROM_LOBBY" });
           break;
 
