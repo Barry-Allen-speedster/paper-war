@@ -53,6 +53,16 @@ const StateHashSchema = z.object({
 
 const RematchSchema = z.object({
   type: z.literal("rematch"),
+  seed: z.number().int(),
+  rules: z.object({
+    shotsPerTurn: z.number().int().min(1).max(3),
+    queenTakesTwo: z.boolean(),
+    queenKillSkipsTurn: z.boolean(),
+    allUnitsWin: z.boolean(),
+    showUnitsAfterReady: z.boolean(),
+    kingTakesFour: z.boolean(),
+    streakRevive: z.boolean(),
+  }),
   seq: z.number().int().nonnegative(),
 });
 

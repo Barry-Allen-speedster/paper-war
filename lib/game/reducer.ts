@@ -355,7 +355,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     }
 
     case "SYNC_ONLINE_CONFIG": {
-      if (state.phase !== "Lobby" || state.config.mode !== "online") return state;
+      if ((state.phase !== "Lobby" && state.phase !== "GameOver") || state.config.mode !== "online") return state;
       const rules = { ...action.rules };
       const players = state.players.map((player) => ({
         ...player,
@@ -389,11 +389,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "REMATCH": {
       if (state.phase !== "GameOver") return state;
       const fresh = createInitialState();
+      const p1 = makePlayer("p1");
+      const p2 = makePlayer("p2");
       return {
         ...fresh,
         phase: "Setup",
         config: state.config,
-        players: [makePlayer("p1"), makePlayer("p2")],
+        players: [
+          { ...p1, units: applyRulesToArmy(p1.units, state.config.rules) },
+          { ...p2, units: applyRulesToArmy(p2.units, state.config.rules) },
+        ],
         shotsRemainingInTurn: state.config.rules.shotsPerTurn,
         consecutiveSoldierKills: 0,
         pendingRevivePlayerId: null,

@@ -77,6 +77,29 @@ describe("reducer", () => {
     });
   });
 
+  describe("online rematch", () => {
+    it("restarts with the match rules and multi-hit unit health", () => {
+      const rules = {
+        ...C.DEFAULT_RULES,
+        queenTakesTwo: true,
+        kingTakesFour: true,
+        shotsPerTurn: 2,
+      };
+      let s = gameReducer(createInitialState(), {
+        type: "START_GAME",
+        config: { ...defaultConfig, mode: "online", rules },
+      });
+      s = gameReducer(s, { type: "GAME_OVER", winner: "p1" });
+      s = gameReducer(s, { type: "REMATCH" });
+
+      expect(s.phase).toBe("Setup");
+      expect(s.config.rules).toEqual(rules);
+      expect(s.shotsRemainingInTurn).toBe(2);
+      expect(s.players[0].units.find((unit) => unit.type === "queen")?.hitsRemaining).toBe(2);
+      expect(s.players[1].units.find((unit) => unit.type === "king")?.hitsRemaining).toBe(4);
+    });
+  });
+
   describe("deployment", () => {
     it("LOCK_LAYOUT by both players → Aiming", () => {
       const s = fullyDeployedState();

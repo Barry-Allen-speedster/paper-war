@@ -84,6 +84,7 @@ function OnlineGameInner() {
         }
 
         case "rematch":
+          dispatch({ type: "SYNC_ONLINE_CONFIG", seed: msg.seed, rules: msg.rules });
           dispatch({ type: "REMATCH" });
           break;
 

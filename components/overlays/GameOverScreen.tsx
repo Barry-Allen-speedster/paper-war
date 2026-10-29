@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useGameStore } from "@hooks/useGameStore";
 import { useSettingsStore } from "@hooks/useSettingsStore";
+import { useNetStore } from "@hooks/useNetStore";
 import { Button } from "@components/ui/Button";
 import { UnitMarker } from "@components/battlefield/UnitMarker";
 import { t } from "@lib/i18n";
@@ -14,6 +15,7 @@ interface Props {
 export function GameOverScreen({ viewingPlayerId }: Props) {
   const router = useRouter();
   const { gameState, dispatch } = useGameStore();
+  const transport = useNetStore((s) => s.transport);
   const { recordWin, recordLoss, difficulty } = useSettingsStore();
   const { winner, players, config } = gameState;
 
@@ -40,6 +42,14 @@ export function GameOverScreen({ viewingPlayerId }: Props) {
 
   function handleRematch() {
     sessionStorage.removeItem("pw-stats-recorded");
+    if (config.mode === "online") {
+      transport?.send({
+        type: "rematch",
+        seed: config.seed,
+        rules: config.rules,
+        seq: 0,
+      });
+    }
     dispatch({ type: "REMATCH" });
     router.push(config.mode === "local" ? "/play/local" : config.mode === "ai" ? "/play/ai" : "/play/online");
   }
