@@ -8,7 +8,8 @@
  */
 import type { Vec2, Unit } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealAimPos, applyAimError } from "./aimError";
+import { idealAimPos, applyAimError, bestBomberPowerAim } from "./aimError";
+import { getBomberBlastVictimIds } from "../game/rules";
 
 const MEDIUM_SIGMA = 28;
 
@@ -22,6 +23,11 @@ export class MediumAI implements AIStrategy {
     const rules = config.rules;
 
     if (visibleEnemyUnits.length === 0) return { x: rng.next(), y: rng.next() };
+
+    if (view.bomberPowerShot) {
+      const clusterAim = bestBomberPowerAim(visibleEnemyUnits, view.isPortrait);
+      if (clusterAim) return applyAimError(clusterAim, MEDIUM_SIGMA, rng);
+    }
 
     const lastShot = shotHistory[shotHistory.length - 1];
 
@@ -46,7 +52,7 @@ export class MediumAI implements AIStrategy {
 
     // Pick target based on active rules
     const target = this.pickTarget(visibleEnemyUnits, shotHistory, rules);
-    const aim = idealAimPos(target);
+    const aim = idealAimPos(target, view.isPortrait);
     this.lastTarget = aim;
     this.lastTargetUnit = target;
     const shot = applyAimError(aim, MEDIUM_SIGMA, rng);
@@ -61,7 +67,11 @@ export class MediumAI implements AIStrategy {
   ): Unit {
     const king = units.find((u) => u.type === "king");
     const queen = units.find((u) => u.type === "queen");
-    const soldiers = units.filter((u) => u.type === "soldier");
+    const bomber = units.find((u) => u.type === "bomber");
+    const soldiers = units.filter((u) => u.type === "soldier" || u.type === "bomber");
+
+    // Take a bomber shot when its blast can remove multiple units at once.
+    if (bomber && getBomberBlastVictimIds(bomber, units).length >= 2) return bomber;
 
     if (rules.allUnitsWin) {
       // Must kill everything — pick easiest (most-hit soldiers first, then queen, then king)

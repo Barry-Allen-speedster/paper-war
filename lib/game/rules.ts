@@ -6,6 +6,7 @@ import type { Vec2, Unit, Shot, PlayerState, ShotResult, UnitType, PlayerId, Rul
 import { DEFAULT_CONFIG } from "./config";
 import { toRef, distance, quadrantOf } from "./geometry";
 import { nanoid } from "../utils/nanoid";
+import { createRNG } from "./rng";
 
 const C = DEFAULT_CONFIG;
 
@@ -13,7 +14,54 @@ export interface ShotComputeResult {
   result: ShotResult;
   hitUnitId?: string;
   killedUnitType?: UnitType;
+  splashKilledUnitIds?: string[];
+  bomberPowerShot?: boolean;
+  bomberPowerHitUnitIds?: string[];
+  bomberPowerKilledUnitIds?: string[];
+  bomberPowerKilledUnitTypes?: UnitType[];
   revealedQuadrant?: 0 | 1 | 2 | 3;
+}
+
+/** Each player gets one deterministic, random powered shot in their first four shots. */
+export function getBomberPowerShotNumber(seed: number, playerId: PlayerId): number {
+  const playerSeed = (seed + (playerId === "p1" ? 0x51f15e : 0x2c9277)) >>> 0;
+  return createRNG(playerSeed).nextInt(1, C.BOMBER_POWER_SHOT_WINDOW);
+}
+
+export function hasLivingBomber(player: PlayerState, enabled: boolean): boolean {
+  return enabled && player.units.some((unit) => unit.type === "bomber" && unit.alive);
+}
+
+export function isBomberPowerShot(
+  seed: number,
+  playerId: PlayerId,
+  shotsTaken: number,
+  player: PlayerState,
+  enabled: boolean
+): boolean {
+  return shotsTaken < C.BOMBER_POWER_SHOT_WINDOW &&
+    shotsTaken + 1 === getBomberPowerShotNumber(seed, playerId) &&
+    hasLivingBomber(player, enabled);
+}
+
+/** Return living units caught in a bomber's blast, excluding the bomber itself. */
+export function getBomberBlastVictimIds(bomber: Unit, units: Unit[]): string[] {
+  const bomberPos = toRef(bomber.pos);
+  return units
+    .filter((unit) =>
+      unit.alive &&
+      unit.id !== bomber.id &&
+      distance(bomberPos, toRef(unit.pos)) <= C.BOMBER_BLAST_RADIUS
+    )
+    .map((unit) => unit.id);
+}
+
+/** Return all living units within a powered bomber shot's area of effect. */
+export function getBomberPowerShotVictimIds(pos: Vec2, units: Unit[]): string[] {
+  const shotPos = toRef(pos);
+  return units
+    .filter((unit) => unit.alive && distance(shotPos, toRef(unit.pos)) <= C.BOMBER_POWER_SHOT_RADIUS)
+    .map((unit) => unit.id);
 }
 
 /**
@@ -23,9 +71,28 @@ export interface ShotComputeResult {
 export function computeShotResult(
   pos: Vec2,
   targetPlayer: PlayerState,
-  rules: RuleConfig
+  rules: RuleConfig,
+  bomberPowerShot = false
 ): ShotComputeResult {
   const posRef = toRef(pos);
+
+  if (bomberPowerShot) {
+    const blastHits = targetPlayer.units.filter((unit) =>
+      unit.alive && distance(posRef, toRef(unit.pos)) <= C.BOMBER_POWER_SHOT_RADIUS
+    );
+    if (blastHits.length > 0) {
+      const killed = blastHits.filter((unit) => unit.hitsRemaining <= 1);
+      return {
+        result: killed.length > 0 ? "kill" : "hit",
+        hitUnitId: blastHits[0]!.id,
+        killedUnitType: killed[0]?.type,
+        bomberPowerShot: true,
+        bomberPowerHitUnitIds: blastHits.map((unit) => unit.id),
+        bomberPowerKilledUnitIds: killed.map((unit) => unit.id),
+        bomberPowerKilledUnitTypes: killed.map((unit) => unit.type),
+      };
+    }
+  }
 
   // Check dead units first → "waste"
   for (const unit of targetPlayer.units) {
@@ -33,7 +100,7 @@ export function computeShotResult(
       const unitRef = toRef(unit.pos);
       const combinedRadius = C.HIT_RADIUS[unit.type] + C.SHOT_RADIUS;
       if (distance(posRef, unitRef) < combinedRadius) {
-        return { result: "waste" };
+        return { result: "waste", bomberPowerShot };
       }
     }
   }
@@ -51,15 +118,19 @@ export function computeShotResult(
 
       const out: ShotComputeResult = {
         result,
+        bomberPowerShot,
         hitUnitId: unit.id,
         killedUnitType: killed ? unit.type : undefined,
+        ...(killed && unit.type === "bomber"
+          ? { splashKilledUnitIds: getBomberBlastVictimIds(unit, targetPlayer.units) }
+          : {}),
       };
 
       return out;
     }
   }
 
-  return { result: "miss" };
+  return { result: "miss", bomberPowerShot };
 }
 
 /**
@@ -76,7 +147,17 @@ export function applyShot(
     return targetPlayer;
   }
 
+  const splashVictims = new Set(shotResult.splashKilledUnitIds ?? []);
+  const powerHitIds = new Set(shotResult.bomberPowerHitUnitIds ?? []);
+  const powerKilledIds = new Set(shotResult.bomberPowerKilledUnitIds ?? []);
   const updatedUnits = targetPlayer.units.map((unit): Unit => {
+    if (splashVictims.has(unit.id)) {
+      return { ...unit, alive: false, hitsRemaining: 0 };
+    }
+    if (powerHitIds.has(unit.id)) {
+      const hitsRemaining = powerKilledIds.has(unit.id) ? 0 : unit.hitsRemaining - 1;
+      return { ...unit, hitsRemaining, alive: hitsRemaining > 0 };
+    }
     if (unit.id !== shotResult.hitUnitId) return unit;
     const newHitsRemaining = unit.hitsRemaining - 1;
     const alive = newHitsRemaining > 0;
@@ -138,7 +219,7 @@ export function getSkippedPlayer(
   if (
     rules.queenKillSkipsTurn &&
     shot.result === "kill" &&
-    shot.killedUnitType === "queen"
+    (shot.killedUnitType === "queen" || shot.bomberPowerKilledUnitTypes?.includes("queen"))
   ) {
     return defenderId;
   }
@@ -162,6 +243,11 @@ export function buildShot(
     result: computed.result,
     hitUnitId: computed.hitUnitId,
     killedUnitType: computed.killedUnitType,
+    splashKilledUnitIds: computed.splashKilledUnitIds,
+    bomberPowerShot: computed.bomberPowerShot,
+    bomberPowerHitUnitIds: computed.bomberPowerHitUnitIds,
+    bomberPowerKilledUnitIds: computed.bomberPowerKilledUnitIds,
+    bomberPowerKilledUnitTypes: computed.bomberPowerKilledUnitTypes,
     revealedQuadrant: computed.revealedQuadrant,
   };
 }

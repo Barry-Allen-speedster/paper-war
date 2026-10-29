@@ -23,6 +23,7 @@ export function ShotMark({ shot, halfWidth, halfHeight }: Props) {
 
   const dotRadiusPx = (C.SHOT_RADIUS / C.REF_SIZE) * Math.min(halfWidth, halfHeight);
   const missSize = (theme.missMark.size / C.REF_SIZE) * Math.min(halfWidth, halfHeight);
+  const powerBlastRadius = (C.BOMBER_POWER_SHOT_RADIUS / C.REF_SIZE) * Math.min(halfWidth, halfHeight);
 
   const label = isHit
     ? t("battle.log.hit", { unit: shot.killedUnitType ?? "", turn: shot.turn })
@@ -32,6 +33,18 @@ export function ShotMark({ shot, halfWidth, halfHeight }: Props) {
 
   return (
     <g role="img" aria-label={label}>
+      {shot.bomberPowerShot && (
+        <circle
+          cx={cx}
+          cy={cy}
+          r={powerBlastRadius}
+          fill="rgba(217,119,6,0.06)"
+          stroke="#d97706"
+          strokeWidth={1.5}
+          strokeDasharray="5 4"
+          opacity={0.8}
+        />
+      )}
       {isHit && (
         <circle
           cx={cx}

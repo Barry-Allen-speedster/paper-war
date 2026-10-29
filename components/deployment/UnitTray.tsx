@@ -10,12 +10,14 @@ interface Props {
 
 const unitEmoji: Record<UnitType, string> = {
   soldier: "🗡",
+  bomber: "💣",
   queen: "♛",
   king: "♔",
 };
 
 const unitLabel: Record<UnitType, string> = {
   soldier: "deploy.unit.soldier",
+  bomber: "deploy.unit.bomber",
   queen:   "deploy.unit.queen",
   king:    "deploy.unit.king",
 };

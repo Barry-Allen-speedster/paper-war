@@ -35,6 +35,7 @@ export const notebookTheme: ThemeConfig = {
   `,
   hitEffect: {
     soldier: { animationClass: "pw-scribble-small", duration: 400 },
+    bomber:  { animationClass: "pw-scribble-large", duration: 500 },
     queen:   { animationClass: "pw-scribble-large", duration: 500 },
     king:    { animationClass: "pw-scribble-large", duration: 600 },
   },

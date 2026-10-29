@@ -13,9 +13,22 @@ describe("network protocol v0.2", () => {
     if (msg.type === "shot") expect(msg.pos.x).toBe(0.5);
   });
 
+  it("parses a selected online revive", () => {
+    const msg = parseNetMessage({ type: "revive", unitId: "p1-soldier-2", seq: 3 });
+    expect(msg.type).toBe("revive");
+    if (msg.type === "revive") expect(msg.unitId).toBe("p1-soldier-2");
+  });
+
   it("parses valid ready with skinId and inkColor", () => {
-    const msg = parseNetMessage({ type: "ready", skinId: "notebook", inkColor: "#333", seq: 0 });
+    const msg = parseNetMessage({
+      type: "ready",
+      skinId: "notebook",
+      inkColor: "#333",
+      layout: [{ id: "p1-bomber-0", type: "bomber", pos: { x: 0.5, y: 0.5 }, alive: true, hitsRemaining: 1 }],
+      seq: 0,
+    });
     expect(msg.type).toBe("ready");
+    if (msg.type === "ready") expect(msg.layout[0]?.type).toBe("bomber");
   });
 
   it("parses valid stateHash", () => {

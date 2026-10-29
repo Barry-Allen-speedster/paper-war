@@ -11,6 +11,12 @@ function makeUnit(type: Unit["type"], x: number, y: number, id = "test"): Unit {
 }
 
 describe("placement", () => {
+  it("builds the selected soldier count and optional bomber", () => {
+    const army = buildArmy("p1", { soldierCount: 8, bomberEnabled: true });
+    expect(army.filter((unit) => unit.type === "soldier")).toHaveLength(8);
+    expect(army.filter((unit) => unit.type === "bomber")).toHaveLength(1);
+  });
+
   describe("isValidPlacement", () => {
     it("valid placement in safe zone passes", () => {
       const unit = makeUnit("soldier", 0.5, 0.5);

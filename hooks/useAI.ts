@@ -3,7 +3,7 @@
  * AI hook — selects the right strategy, applies think delay, then fires.
  * The AI aims on its own half and goes through the same FIRE flow as a human.
  */
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGameStore } from "./useGameStore";
 import { EasyAI } from "@lib/ai/easy";
 import { MediumAI } from "@lib/ai/medium";
@@ -11,6 +11,7 @@ import { HardAI } from "@lib/ai/hard";
 import type { AIStrategy, AIView } from "@lib/ai/types";
 import { createRNG } from "@lib/game/rng";
 import { DEFAULT_CONFIG } from "@lib/game/config";
+import { isBomberPowerShot } from "@lib/game/rules";
 
 const C = DEFAULT_CONFIG;
 
@@ -22,10 +23,26 @@ function makeStrategy(difficulty: string): AIStrategy {
 
 export function useAI(): void {
   const { gameState, dispatch } = useGameStore();
+  const [isPortrait, setIsPortrait] = useState(false);
   const strategyRef = useRef<AIStrategy | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { phase, config, currentPlayerId, players, turn } = gameState;
+  const { phase, config, currentPlayerId, players, turn, pendingRevivePlayerId } = gameState;
+
+  useEffect(() => {
+    const updateOrientation = () => setIsPortrait(window.innerHeight > window.innerWidth);
+    updateOrientation();
+    window.addEventListener("resize", updateOrientation);
+    return () => window.removeEventListener("resize", updateOrientation);
+  }, []);
+
+  useEffect(() => {
+    if (config.mode !== "ai" || pendingRevivePlayerId !== "p2") return;
+    const fallenSoldier = players[1]!.units.find((unit) => unit.type === "soldier" && !unit.alive);
+    if (fallenSoldier) {
+      dispatch({ type: "REVIVE_SOLDIER", playerId: "p2", unitId: fallenSoldier.id });
+    }
+  }, [config.mode, pendingRevivePlayerId, players, dispatch]);
 
   const isAITurn =
     config.mode === "ai" &&
@@ -52,6 +69,8 @@ export function useAI(): void {
       allEnemyUnits: enemyPlayer.units,
       shotHistory: aiPlayer.shots,
       config,
+      bomberPowerShot: isBomberPowerShot(config.seed, "p2", aiPlayer.shots.length, aiPlayer, config.rules.bomberEnabled),
+      isPortrait,
       rng,
     };
 
@@ -70,5 +89,5 @@ export function useAI(): void {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAITurn, turn]);
+  }, [isAITurn, turn, isPortrait]);
 }

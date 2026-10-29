@@ -11,6 +11,13 @@ describe("DEFAULT_CONFIG", () => {
     const { HIT_RADIUS } = DEFAULT_CONFIG;
     expect(HIT_RADIUS.king).toBeGreaterThan(HIT_RADIUS.queen);
     expect(HIT_RADIUS.queen).toBeGreaterThan(HIT_RADIUS.soldier);
+    expect(HIT_RADIUS.bomber).toBeGreaterThan(HIT_RADIUS.soldier);
+    expect(HIT_RADIUS.bomber).toBeLessThan(HIT_RADIUS.king);
+  });
+
+  it("defaults to five soldiers and no bomber", () => {
+    expect(DEFAULT_CONFIG.DEFAULT_RULES.soldierCount).toBe(5);
+    expect(DEFAULT_CONFIG.DEFAULT_RULES.bomberEnabled).toBe(false);
   });
 
   it("default rules have shotsPerTurn = 1", () => {

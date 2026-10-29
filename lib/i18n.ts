@@ -53,6 +53,7 @@ const en: Record<string, string> = {
   "deploy.pass.tap": "Tap to continue",
   "deploy.tray.label": "Unplaced units",
   "deploy.unit.soldier": "Soldier",
+  "deploy.unit.bomber": "Bomber soldier",
   "deploy.unit.queen": "Queen",
   "deploy.unit.king": "King",
   "deploy.invalid": "Invalid position",

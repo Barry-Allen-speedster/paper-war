@@ -36,8 +36,40 @@ export function RulesPanel() {
 
       <div className="border-t border-[var(--pw-border)]" />
 
+      {/* ── Army size ───────────────────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium">Soldiers per player</p>
+          <p className="text-xs text-[var(--pw-text-muted)]">Choose between 5 and 10 regular soldiers.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            aria-label="Remove one soldier"
+            disabled={rules.soldierCount <= 5}
+            onClick={() => setRules({ soldierCount: Math.max(5, rules.soldierCount - 1) })}
+            className="w-8 h-8 rounded border border-[var(--pw-border)] disabled:opacity-40"
+          >−</button>
+          <span className="min-w-7 text-center font-bold">{rules.soldierCount}</span>
+          <button
+            type="button"
+            aria-label="Add one soldier"
+            disabled={rules.soldierCount >= 10}
+            onClick={() => setRules({ soldierCount: Math.min(10, rules.soldierCount + 1) })}
+            className="w-8 h-8 rounded border border-[var(--pw-border)] disabled:opacity-40"
+          >+</button>
+        </div>
+      </div>
+
+      <div className="border-t border-[var(--pw-border)]" />
+
       {/* ── Toggle rules ─────────────────────────────────────────────────── */}
       {([
+        {
+          key: "bomberEnabled" as const,
+          label: "Add one bomber soldier",
+          desc: "Adds one bomber to each army. It has a larger target circle, explodes when destroyed, and gives one randomly timed wide blast shot during your first four shots if it survives.",
+        },
         {
           key: "queenTakesTwo" as const,
           label: "Queen takes 2 hits",
@@ -92,11 +124,13 @@ export function RulesPanel() {
       ))}
 
       {/* Active rules summary */}
-      {(rules.queenTakesTwo || rules.queenKillSkipsTurn || rules.allUnitsWin || rules.shotsPerTurn > 1 || rules.kingTakesFour || rules.streakRevive) && (
+      {(rules.soldierCount > 5 || rules.bomberEnabled || rules.queenTakesTwo || rules.queenKillSkipsTurn || rules.allUnitsWin || rules.shotsPerTurn > 1 || rules.kingTakesFour || rules.streakRevive) && (
         <div className="mt-1 p-2 rounded-lg bg-[var(--pw-accent)]/10 border border-[var(--pw-accent)]/30">
           <p className="text-xs font-semibold text-[var(--pw-accent)] mb-1">Active rules:</p>
           <ul className="text-xs text-[var(--pw-text)] space-y-0.5">
             {rules.shotsPerTurn > 1 && <li>• {rules.shotsPerTurn} shots per turn</li>}
+            {rules.soldierCount > 5 && <li>• {rules.soldierCount} soldiers per player</li>}
+            {rules.bomberEnabled && <li>• One bomber per player</li>}
             {rules.queenTakesTwo && <li>• Queen requires 2 hits</li>}
             {rules.queenKillSkipsTurn && <li>• Queen kill skips opponent&apos;s turn</li>}
             {rules.allUnitsWin && <li>• Must destroy all units to win</li>}

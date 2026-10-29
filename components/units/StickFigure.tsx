@@ -42,6 +42,22 @@ export function SoldierFigure({ size = 40, color = "currentColor" }: Props) {
   );
 }
 
+export function BomberFigure({ size = 40, color = "currentColor" }: Props) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true" style={{ display: "block" }}>
+      <circle cx="15" cy="7" r="4" stroke={color} strokeWidth="2" />
+      <line x1="15" y1="11" x2="15" y2="25" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="15" y1="15" x2="8" y2="12" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="15" y1="15" x2="23" y2="19" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="15" y1="25" x2="9" y2="36" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <line x1="15" y1="25" x2="21" y2="36" stroke={color} strokeWidth="2" strokeLinecap="round" />
+      <circle cx="29" cy="19" r="6" fill="var(--pw-surface)" stroke={color} strokeWidth="2" />
+      <path d="M29 13v-3l3-2" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M32 7l1-2m1 4 2-1" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function QueenFigure({ size = 40, color = "currentColor" }: Props) {
   return (
     <svg

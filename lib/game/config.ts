@@ -17,12 +17,19 @@ export const DEFAULT_CONFIG = {
   /** Hit radii in reference space */
   HIT_RADIUS: {
     soldier: 18,
+    bomber: 24,
     queen: 22,
     king: 26,
   } as Record<UnitType, number>,
 
   /** Shot dot radius in reference space */
   SHOT_RADIUS: 8,
+  /** Bomber blast radius around its position, measured center-to-center */
+  BOMBER_BLAST_RADIUS: 55,
+  /** Radius of the bomber's one-time powered shot, measured from the landing point */
+  BOMBER_POWER_SHOT_RADIUS: 68,
+  /** Powered shot is randomly assigned to one of this many opening shots per player */
+  BOMBER_POWER_SHOT_WINDOW: 4,
 
   /** Extra clearance between unit edges when placing */
   MIN_UNIT_SPACING: 6,
@@ -30,6 +37,7 @@ export const DEFAULT_CONFIG = {
   /** Army composition per player */
   ARMY: {
     soldier: 5,
+    bomber: 0,
     queen: 1,
     king: 1,
   } as Record<UnitType, number>,
@@ -69,6 +77,8 @@ export const DEFAULT_CONFIG = {
   // ─── Rules defaults ───────────────────────────────────────────────────────
   DEFAULT_RULES: {
     shotsPerTurn: 1,
+    soldierCount: 5,
+    bomberEnabled: false,
     queenTakesTwo: false,
     queenKillSkipsTurn: false,
     allUnitsWin: false,

@@ -44,6 +44,29 @@ describe("HardAI", () => {
     expect(dist).toBeLessThan(0.05);
   });
 
+  it("targets the bomber as a hittable unit when all-units victory is enabled", () => {
+    const ai = new HardAI();
+    const bomber = makeUnit("bomber", 0.8, 0.8, "b1");
+    const king = makeUnit("king", 0.2, 0.2, "k");
+    const view = makeView([king, bomber]);
+    view.config.rules.allUnitsWin = true;
+
+    const pos = ai.chooseShot(view);
+    const dist = Math.hypot(pos.x - 0.2, pos.y - 0.8);
+    expect(dist).toBeLessThan(0.05);
+  });
+
+  it("prioritizes a bomber with multiple units in its blast radius", () => {
+    const ai = new HardAI();
+    const bomber = makeUnit("bomber", 0.5, 0.2, "b1");
+    const nearby1 = makeUnit("soldier", 0.548, 0.2, "s1");
+    const nearby2 = makeUnit("soldier", 0.452, 0.2, "s2");
+    const king = makeUnit("king", 0.5, 0.8, "k");
+
+    const pos = ai.chooseShot({ ...makeView([bomber, nearby1, nearby2, king]), rng: createRNG(1) });
+    expect(Math.hypot(pos.x - 0.5, pos.y - 0.2)).toBeLessThan(0.05);
+  });
+
   it("fallback to random when no enemy units", () => {
     const ai = new HardAI();
     const pos = ai.chooseShot({ ...makeView([]), rng: createRNG(1) });

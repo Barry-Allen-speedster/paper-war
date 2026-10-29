@@ -10,7 +10,7 @@ export interface Vec2 {
   y: number;
 }
 
-export type UnitType = "soldier" | "queen" | "king";
+export type UnitType = "soldier" | "bomber" | "queen" | "king";
 
 export interface Unit {
   id: string;
@@ -31,6 +31,16 @@ export interface Shot {
   result: ShotResult;
   hitUnitId?: string;
   killedUnitType?: UnitType;
+  /** Nearby units destroyed by a bomber's death explosion. */
+  splashKilledUnitIds?: string[];
+  /** This was the player's randomly assigned powered bomber shot. */
+  bomberPowerShot?: boolean;
+  /** Units hit by a powered bomber shot. */
+  bomberPowerHitUnitIds?: string[];
+  /** Units killed by a powered bomber shot. */
+  bomberPowerKilledUnitIds?: string[];
+  /** Types of units killed by a powered bomber shot (for active rule effects). */
+  bomberPowerKilledUnitTypes?: UnitType[];
   revealedQuadrant?: 0 | 1 | 2 | 3;
 }
 
@@ -49,6 +59,8 @@ export type Difficulty = "easy" | "medium" | "hard";
 
 export interface RuleConfig {
   shotsPerTurn: number;
+  soldierCount: number;
+  bomberEnabled: boolean;
   queenTakesTwo: boolean;
   queenKillSkipsTurn: boolean;
   allUnitsWin: boolean;

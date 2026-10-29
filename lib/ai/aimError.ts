@@ -81,3 +81,23 @@ export function countOverlap(pos: Vec2, aliveUnits: Unit[]): number {
   }
   return count;
 }
+
+/** Aim a powered bomber shot at the center of the densest visible enemy cluster. */
+export function bestBomberPowerAim(aliveUnits: Unit[], isPortrait = false): Vec2 | null {
+  if (aliveUnits.length === 0) return null;
+  let best = aliveUnits[0]!;
+  let bestCount = -1;
+  const radius = C.BOMBER_POWER_SHOT_RADIUS / C.REF_SIZE;
+  for (const candidate of aliveUnits) {
+    const count = aliveUnits.filter((unit) => {
+      const dx = unit.pos.x - candidate.pos.x;
+      const dy = unit.pos.y - candidate.pos.y;
+      return dx * dx + dy * dy <= radius * radius;
+    }).length;
+    if (count > bestCount) {
+      best = candidate;
+      bestCount = count;
+    }
+  }
+  return idealAimPos(best, isPortrait);
+}

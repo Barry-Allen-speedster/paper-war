@@ -11,7 +11,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useGameStore } from "@hooks/useGameStore";
 import { useTheme } from "@hooks/useTheme";
 import { useResizeObserver } from "@hooks/useResizeObserver";
-import { computeShotResult, buildShot } from "@lib/game/rules";
+import { computeShotResult, buildShot, isBomberPowerShot } from "@lib/game/rules";
 import { t } from "@lib/i18n";
 import { DEFAULT_CONFIG } from "@lib/game/config";
 import { createRNG } from "@lib/game/rng";
@@ -63,6 +63,15 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
 
   const p1 = players[0]!;
   const p2 = players[1]!;
+  const activePlayer = players[currentPlayerId === "p1" ? 0 : 1]!;
+  const activePlayerShotCount = activePlayer.shots.length;
+  const bomberPowerReady = isBomberPowerShot(
+    config.seed,
+    currentPlayerId,
+    activePlayerShotCount,
+    activePlayer,
+    config.rules.bomberEnabled
+  );
 
   // The ATTACKER's half is the currentPlayer's half
   // P1 is always on the left (landscape) / top (portrait)
@@ -94,6 +103,7 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
   const heavyHit = resolvedShot
     ? resolvedShot.killedUnitType === "king"   ? 1.0
     : resolvedShot.killedUnitType === "queen"  ? 0.6
+    : resolvedShot.killedUnitType === "bomber" ? 0.8
     : resolvedShot.result === "hit"            ? 0.3
     : 0.0
     : 0.0;
@@ -125,7 +135,7 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
       ? { x: raw.x, y: 1 - raw.y }   // portrait: crease is horizontal, Y mirrors
       : { x: 1 - raw.x, y: raw.y };  // landscape: crease is vertical, X mirrors
 
-    const computed = computeShotResult(mirroredPos, defender, config.rules);
+    const computed = computeShotResult(mirroredPos, defender, config.rules, bomberPowerReady);
     const shot = buildShot(mirroredPos, currentPlayerId, turn, computed);
 
     setResolvedShot(shot);
@@ -193,14 +203,24 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
       : id === "p1" ? t("shared.player1") : t("shared.player2");
 
   const allShots = [...p1.shots, ...p2.shots];
+  const reviveCandidates = players[viewingPlayerId === "p1" ? 0 : 1]!.units
+    .filter((unit) => unit.type === "soldier" && !unit.alive);
 
   // Result banner text
+  const splashCount = resolvedShot?.splashKilledUnitIds?.length ?? 0;
   const resultText = resolvedShot
-    ? resolvedShot.result === "kill"  ? `💥 ${resolvedShot.killedUnitType} destroyed!`
+    ? resolvedShot.killedUnitType === "bomber" && resolvedShot.result === "kill"
+      ? splashCount > 0
+        ? `💣 Bomber exploded — ${splashCount} nearby unit${splashCount === 1 ? "" : "s"} destroyed!`
+        : "💣 Bomber exploded!"
+    : resolvedShot.result === "kill"  ? `💥 ${resolvedShot.killedUnitType} destroyed!`
     : resolvedShot.result === "hit"   ? "💥 Hit!"
     : resolvedShot.result === "waste" ? "♻ Wasted ink"
     : "● Miss"
     : "";
+  const powerShotResultText = resolvedShot?.bomberPowerShot
+    ? `💣 Powered bomber shot — ${resolvedShot.bomberPowerKilledUnitIds?.length ?? 0} killed, ${Math.max(0, (resolvedShot.bomberPowerHitUnitIds?.length ?? 0) - (resolvedShot.bomberPowerKilledUnitIds?.length ?? 0))} hit`
+    : null;
 
   const skippedNotice = gameState.skippedTurnPlayerId !== null
     ? `⏭ ${playerLabel(gameState.skippedTurnPlayerId)}'s turn skipped!`
@@ -371,7 +391,7 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
                   : "bg-[var(--pw-surface)] text-[var(--pw-text-muted)] border border-[var(--pw-border)]",
               ].join(" ")}
             >
-              {resultText}
+              {powerShotResultText ?? resultText}
             </div>
             {skippedNotice && (
               <div className="px-4 py-1.5 rounded-full text-xs font-bold bg-yellow-500 text-white shadow-lg animate-fade-in">
@@ -390,19 +410,23 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
                 3 soldiers eliminated in a row! Choose one of your fallen soldiers to revive.
               </p>
               <div className="flex flex-wrap gap-2">
-                {players[viewingPlayerId === "p1" ? 0 : 1]!.units
-                  .filter((u) => u.type === "soldier" && !u.alive)
-                  .map((u) => (
+                {reviveCandidates.map((u) => {
+                  const soldierNumber = Number(u.id.split("-").at(-1) ?? 0) + 1;
+                  return (
                     <button
                       key={u.id}
-                      onClick={() => dispatch({ type: "REVIVE_SOLDIER", playerId: viewingPlayerId, unitId: u.id })}
-                      className="px-4 py-2 rounded-lg bg-[var(--pw-accent)] text-white font-semibold text-sm hover:opacity-90"
+                      onClick={() => {
+                        dispatch({ type: "REVIVE_SOLDIER", playerId: viewingPlayerId, unitId: u.id });
+                        if (config.mode === "online") transport?.send({ type: "revive", unitId: u.id, seq: 0 });
+                      }}
+                      aria-label={`Revive soldier ${soldierNumber}`}
+                      className="w-full px-3 py-3 rounded-lg bg-[var(--pw-accent)] text-white font-semibold text-xs text-left hover:opacity-90"
                     >
-                      Revive Soldier
+                      Soldier {soldierNumber} · {Math.round(u.pos.x * 100)}%, {Math.round(u.pos.y * 100)}%
                     </button>
-                  ))}
-                {players[viewingPlayerId === "p1" ? 0 : 1]!.units
-                  .filter((u) => u.type === "soldier" && !u.alive).length === 0 && (
+                  );
+                })}
+                {reviveCandidates.length === 0 && (
                   <p className="text-sm text-[var(--pw-text-muted)]">No fallen soldiers to revive.</p>
                 )}
               </div>
@@ -419,9 +443,12 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
       {/* ── Action bar ───────────────────────────────────────────────────── */}
       <div className="flex items-center justify-center gap-4 px-4 py-3 border-t border-[var(--pw-border)] bg-[var(--pw-surface)]">
         {isAiming && (
-          <Button onClick={handleFire} className="px-8 py-3 text-base">
-            🎯 {t("battle.fire")}
-          </Button>
+          <div className="flex flex-col items-center gap-1">
+            {bomberPowerReady && <span className="text-xs font-semibold text-amber-700">💣 Wide blast ready</span>}
+            <Button onClick={handleFire} className="px-5 sm:px-8 py-3 text-sm sm:text-base">
+              {bomberPowerReady ? "💣 Blast shot" : `🎯 ${t("battle.fire")}`}
+            </Button>
+          </div>
         )}
 
         {isAnimating && (

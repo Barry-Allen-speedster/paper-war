@@ -3,7 +3,7 @@
  * Pure function — no side effects, no DOM, no async.
  * Illegal transitions return state unchanged (no throws in production).
  */
-import type { GameState, GameAction, PlayerState, PlayerId, GamePhase } from "./types";
+import type { GameState, GameAction, PlayerState, PlayerId, GamePhase, RuleConfig } from "./types";
 import { DEFAULT_CONFIG } from "./config";
 import { buildArmy, randomPlacement, moveUnit } from "./placement";
 import { computeShotResult, applyShot, applyRulesToArmy, checkWinCondition, buildShot, getSkippedPlayer } from "./rules";
@@ -14,10 +14,10 @@ const C = DEFAULT_CONFIG;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makePlayer(id: PlayerId): PlayerState {
+function makePlayer(id: PlayerId, rules: RuleConfig = C.DEFAULT_RULES): PlayerState {
   return {
     id,
-    units: buildArmy(id),
+    units: buildArmy(id, rules),
     shots: [],
     isReady: false,
     layoutLocked: false,
@@ -87,8 +87,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "START_GAME": {
       const rng = createRNG(action.config.seed);
-      const p1 = makePlayer("p1");
-      const p2 = makePlayer("p2");
+      const p1 = makePlayer("p1", action.config.rules);
+      const p2 = makePlayer("p2", action.config.rules);
       const rules = action.config.rules;
       // Advance RNG so placement randomization differs from the raw seed
       const derivedSeed = rng.nextInt(1, 2 ** 31 - 1);
@@ -232,7 +232,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       const defender = getPlayer(state, defenderId);
 
       // Compute result (for local/ai modes; online mode sends result via network)
-      const computed = computeShotResult(shot.pos, defender, state.config.rules);
+      const computed = computeShotResult(shot.pos, defender, state.config.rules, shot.bomberPowerShot);
       const resolvedShot = { ...shot, ...computed };
 
       // Update defender units
@@ -357,10 +357,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "SYNC_ONLINE_CONFIG": {
       if ((state.phase !== "Lobby" && state.phase !== "GameOver") || state.config.mode !== "online") return state;
       const rules = { ...action.rules };
-      const players = state.players.map((player) => ({
-        ...player,
-        units: applyRulesToArmy(player.units, rules),
-      })) as [PlayerState, PlayerState];
+      const p1 = makePlayer("p1", rules);
+      const p2 = makePlayer("p2", rules);
+      const players = [
+        { ...p1, units: applyRulesToArmy(p1.units, rules) },
+        { ...p2, units: applyRulesToArmy(p2.units, rules) },
+      ] as [PlayerState, PlayerState];
       return {
         ...state,
         config: { ...state.config, seed: action.seed, rules },
@@ -389,8 +391,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "REMATCH": {
       if (state.phase !== "GameOver") return state;
       const fresh = createInitialState();
-      const p1 = makePlayer("p1");
-      const p2 = makePlayer("p2");
+      const p1 = makePlayer("p1", state.config.rules);
+      const p2 = makePlayer("p2", state.config.rules);
       return {
         ...fresh,
         phase: "Setup",

@@ -56,7 +56,7 @@ function OnlineGameInner() {
     send();
     const id = setInterval(send, 1500);
     return () => clearInterval(id);
-  }, [transport, myDeployed, phase]);
+  }, [transport, myDeployed, phase, myPlayerId]);
 
   // ── Message handler — stable, uses ref for state ───────────────────────────
   useEffect(() => {
@@ -82,6 +82,10 @@ function OnlineGameInner() {
           dispatch({ type: "FIRE" });
           break;
         }
+
+        case "revive":
+          dispatch({ type: "REVIVE_SOLDIER", playerId: oppPlayerId, unitId: msg.unitId });
+          break;
 
         case "rematch":
           dispatch({ type: "SYNC_ONLINE_CONFIG", seed: msg.seed, rules: msg.rules });

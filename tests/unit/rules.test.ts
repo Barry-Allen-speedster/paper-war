@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeShotResult, checkWinCondition, applyShot, buildShot, getSkippedPlayer } from "@lib/game/rules";
+import { computeShotResult, checkWinCondition, applyShot, buildShot, getSkippedPlayer, getBomberPowerShotNumber, isBomberPowerShot } from "@lib/game/rules";
 import { DEFAULT_CONFIG } from "@lib/game/config";
 import { nanoid } from "@lib/utils/nanoid";
 import type { Unit, PlayerState, RuleConfig, Vec2 } from "@lib/game/types";
@@ -52,6 +52,62 @@ describe("rules — hit detection", () => {
     const offset = (combinedRadius + 2) / C.REF_SIZE;
     const result = computeShotResult({ x: 0.5 + offset, y: 0.5 }, player, DEFAULT_RULES);
     expect(result.result).toBe("miss");
+  });
+
+  it("bomber has a wider hit circle than a regular soldier", () => {
+    const bomber = makeUnit("bomber", 0.5, 0.5);
+    const player = makePlayer([bomber]);
+    const offset = (C.HIT_RADIUS.soldier + C.SHOT_RADIUS + 1) / C.REF_SIZE;
+    const result = computeShotResult({ x: 0.5 + offset, y: 0.5 }, player, DEFAULT_RULES);
+    expect(result.result).toBe("kill");
+    expect(result.hitUnitId).toBe(bomber.id);
+  });
+
+  it("a killed bomber explodes and eliminates nearby units only", () => {
+    const bomber = makeUnit("bomber", 0.5, 0.5, "b1");
+    const nearbySoldier = makeUnit("soldier", 0.54, 0.5, "s1");
+    const nearbyQueen = makeUnit("queen", 0.5, 0.55, "q1", 2);
+    const distantSoldier = makeUnit("soldier", 0.57, 0.5, "s2");
+    const player = makePlayer([bomber, nearbySoldier, nearbyQueen, distantSoldier]);
+
+    const result = computeShotResult(aimAt(bomber), player, DEFAULT_RULES);
+    expect(result.splashKilledUnitIds).toEqual(["s1", "q1"]);
+
+    const shot = buildShot(aimAt(bomber), "p1", 1, result);
+    const updated = applyShot(result, shot, player, DEFAULT_RULES);
+    expect(updated.units.find((unit) => unit.id === "b1")?.alive).toBe(false);
+    expect(updated.units.find((unit) => unit.id === "s1")?.alive).toBe(false);
+    expect(updated.units.find((unit) => unit.id === "q1")?.hitsRemaining).toBe(0);
+    expect(updated.units.find((unit) => unit.id === "s2")?.alive).toBe(true);
+  });
+
+  it("assigns exactly one deterministic bomber shot within a player's first four shots", () => {
+    const bomberPlayer = { ...makePlayer([makeUnit("bomber", 0.5, 0.5)]), id: "p1" as const };
+    const selected = getBomberPowerShotNumber(42, "p1");
+    expect(selected).toBeGreaterThanOrEqual(1);
+    expect(selected).toBeLessThanOrEqual(4);
+    expect(getBomberPowerShotNumber(42, "p1")).toBe(selected);
+    expect(isBomberPowerShot(42, "p1", selected - 1, bomberPlayer, true)).toBe(true);
+    expect(isBomberPowerShot(42, "p1", selected, bomberPlayer, true)).toBe(false);
+    expect(isBomberPowerShot(42, "p1", selected - 1, bomberPlayer, false)).toBe(false);
+    expect(isBomberPowerShot(42, "p1", selected - 1, { ...bomberPlayer, units: [{ ...bomberPlayer.units[0]!, alive: false }] }, true)).toBe(false);
+  });
+
+  it("powered bomber shot hits multiple units in its wider area and applies one hit to each", () => {
+    const soldier = makeUnit("soldier", 0.5, 0.5, "s1");
+    const queen = makeUnit("queen", 0.56, 0.5, "q1", 2);
+    const nearbySoldier = makeUnit("soldier", 0.55, 0.5, "s2");
+    const player = makePlayer([soldier, queen, nearbySoldier]);
+    const result = computeShotResult({ x: 0.5, y: 0.5 }, player, DEFAULT_RULES, true);
+    expect(result.bomberPowerShot).toBe(true);
+    expect(result.bomberPowerHitUnitIds).toEqual(["s1", "q1", "s2"]);
+    expect(result.bomberPowerKilledUnitIds).toEqual(["s1", "s2"]);
+
+    const shot = buildShot({ x: 0.5, y: 0.5 }, "p1", 1, result);
+    const updated = applyShot(result, shot, player, DEFAULT_RULES);
+    expect(updated.units.find((unit) => unit.id === "s1")?.alive).toBe(false);
+    expect(updated.units.find((unit) => unit.id === "q1")?.hitsRemaining).toBe(1);
+    expect(updated.units.find((unit) => unit.id === "s2")?.alive).toBe(false);
   });
 
   it("shot on dead unit returns waste", () => {

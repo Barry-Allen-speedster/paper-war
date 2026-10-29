@@ -7,6 +7,18 @@
 import { z } from "zod";
 import type { RuleConfig } from "../game/types";
 
+const RuleConfigSchema = z.object({
+  shotsPerTurn: z.number().int().min(1).max(3),
+  soldierCount: z.number().int().min(5).max(10),
+  bomberEnabled: z.boolean(),
+  queenTakesTwo: z.boolean(),
+  queenKillSkipsTurn: z.boolean(),
+  allUnitsWin: z.boolean(),
+  showUnitsAfterReady: z.boolean(),
+  kingTakesFour: z.boolean(),
+  streakRevive: z.boolean(),
+});
+
 const Vec2Schema = z.object({
   x: z.number().min(0).max(1),
   y: z.number().min(0).max(1),
@@ -25,7 +37,7 @@ const ReadySchema = z.object({
   inkColor: z.string(),
   layout: z.array(z.object({
     id: z.string(),
-    type: z.enum(["soldier", "queen", "king"]),
+    type: z.enum(["soldier", "bomber", "queen", "king"]),
     pos: Vec2Schema,
     alive: z.boolean(),
     hitsRemaining: z.number().int().nonnegative(),
@@ -38,6 +50,13 @@ const ShotSchema = z.object({
   type: z.literal("shot"),
   pos: Vec2Schema,
   shotId: z.string(),
+  seq: z.number().int().nonnegative(),
+});
+
+/** The owner selects which fallen soldier to revive. */
+const ReviveSchema = z.object({
+  type: z.literal("revive"),
+  unitId: z.string(),
   seq: z.number().int().nonnegative(),
 });
 
@@ -54,15 +73,7 @@ const StateHashSchema = z.object({
 const RematchSchema = z.object({
   type: z.literal("rematch"),
   seed: z.number().int(),
-  rules: z.object({
-    shotsPerTurn: z.number().int().min(1).max(3),
-    queenTakesTwo: z.boolean(),
-    queenKillSkipsTurn: z.boolean(),
-    allUnitsWin: z.boolean(),
-    showUnitsAfterReady: z.boolean(),
-    kingTakesFour: z.boolean(),
-    streakRevive: z.boolean(),
-  }),
+  rules: RuleConfigSchema,
   seq: z.number().int().nonnegative(),
 });
 
@@ -85,15 +96,7 @@ const ForfeitSchema = z.object({
 const StartGameMsgSchema = z.object({
   type: z.literal("startGame"),
   seed: z.number().int(),
-  rules: z.object({
-    shotsPerTurn: z.number().int().min(1).max(3),
-    queenTakesTwo: z.boolean(),
-    queenKillSkipsTurn: z.boolean(),
-    allUnitsWin: z.boolean(),
-    showUnitsAfterReady: z.boolean(),
-    kingTakesFour: z.boolean(),
-    streakRevive: z.boolean(),
-  }),
+  rules: RuleConfigSchema,
   seq: z.number().int().nonnegative(),
 });
 
@@ -101,6 +104,7 @@ export const NetMessageSchema = z.discriminatedUnion("type", [
   HelloSchema,
   ReadySchema,
   ShotSchema,
+  ReviveSchema,
   StateHashSchema,
   RematchSchema,
   PingSchema,

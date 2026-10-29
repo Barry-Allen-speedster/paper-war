@@ -15,7 +15,7 @@ const REQUIRED_CSS_VARS: (keyof CSSVars)[] = [
   "--pw-font",
 ];
 
-const UNIT_TYPES = ["soldier", "queen", "king"] as const;
+const UNIT_TYPES = ["soldier", "bomber", "queen", "king"] as const;
 
 describe("theme completeness", () => {
   for (const id of THEME_IDS) {

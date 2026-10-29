@@ -44,6 +44,27 @@ describe("MediumAI", () => {
     expect(pos.y).toBeLessThan(0.5); // closer to crease side
   });
 
+  it("treats the bomber as a soldier target when all-units victory is enabled", () => {
+    const ai = new MediumAI();
+    const bomber = makeUnit("bomber", 0.5, 0.2, "b1");
+    const view = makeView([bomber, makeUnit("king", 0.5, 0.8, "k")]);
+    view.config.rules.allUnitsWin = true;
+
+    const pos = ai.chooseShot(view);
+    expect(pos.y).toBeLessThan(0.5);
+  });
+
+  it("targets a bomber whose explosion can catch multiple nearby units", () => {
+    const ai = new MediumAI();
+    const bomber = makeUnit("bomber", 0.5, 0.2, "b1");
+    const nearby1 = makeUnit("soldier", 0.548, 0.2, "s1");
+    const nearby2 = makeUnit("soldier", 0.452, 0.2, "s2");
+    const king = makeUnit("king", 0.5, 0.8, "k");
+
+    const pos = ai.chooseShot({ ...makeView([bomber, nearby1, nearby2, king]), rng: createRNG(1) });
+    expect(pos.y).toBeLessThan(0.5);
+  });
+
   it("never fires out of bounds", () => {
     const ai = new MediumAI();
     for (let i = 0; i < 20; i++) {

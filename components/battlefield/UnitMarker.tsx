@@ -1,7 +1,7 @@
 "use client";
 import type { Unit } from "@lib/game/types";
 import { DEFAULT_CONFIG } from "@lib/game/config";
-import { SoldierFigure, QueenFigure, KingFigure } from "@components/units/StickFigure";
+import { SoldierFigure, BomberFigure, QueenFigure, KingFigure } from "@components/units/StickFigure";
 
 interface Props {
   unit: Unit;
@@ -14,12 +14,14 @@ const C = DEFAULT_CONFIG;
 
 const FIGURES = {
   soldier: SoldierFigure,
+  bomber: BomberFigure,
   queen:   QueenFigure,
   king:    KingFigure,
 } as const;
 
 const UNIT_COLORS = {
   soldier: "var(--pw-text-muted)",
+  bomber: "#d97706",
   queen:   "var(--pw-text)",
   king:    "var(--pw-accent)",
 } as const;
@@ -42,6 +44,17 @@ export function UnitMarker({ unit, halfWidth, halfHeight, revealed }: Props) {
       aria-label={`${isDead ? "Dead " : ""}${unit.type}`}
       transform={`translate(${cx},${cy})`}
     >
+      {unit.type === "bomber" && unit.alive && (
+        <circle
+          r={C.BOMBER_BLAST_RADIUS * scale}
+          fill="rgba(217,119,6,0.035)"
+          stroke="#d97706"
+          strokeWidth={1}
+          strokeDasharray="4 4"
+          opacity={0.5}
+          aria-hidden="true"
+        />
+      )}
       {/* Circle background */}
       <circle
         r={r}

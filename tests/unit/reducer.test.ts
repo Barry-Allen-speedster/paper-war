@@ -75,6 +75,33 @@ describe("reducer", () => {
       });
       expect(s.shotsRemainingInTurn).toBe(3);
     });
+
+    it("builds the configured army for local play", () => {
+      const rules = { ...C.DEFAULT_RULES, soldierCount: 8, bomberEnabled: true };
+      const s = gameReducer(createInitialState(), {
+        type: "START_GAME",
+        config: { ...defaultConfig, rules },
+      });
+      expect(s.players[0].units.filter((unit) => unit.type === "soldier")).toHaveLength(8);
+      expect(s.players[0].units.filter((unit) => unit.type === "bomber")).toHaveLength(1);
+    });
+
+    it("uses the host army options for both online players", () => {
+      let s = gameReducer(createInitialState(), {
+        type: "START_GAME",
+        config: { ...defaultConfig, mode: "online" },
+      });
+      s = gameReducer(s, {
+        type: "SYNC_ONLINE_CONFIG",
+        seed: 123,
+        rules: { ...C.DEFAULT_RULES, soldierCount: 7, bomberEnabled: true },
+      });
+      for (const player of s.players) {
+        expect(player.units.filter((unit) => unit.type === "soldier")).toHaveLength(7);
+        expect(player.units.filter((unit) => unit.type === "bomber")).toHaveLength(1);
+      }
+      expect(s.config.seed).toBe(123);
+    });
   });
 
   describe("online rematch", () => {

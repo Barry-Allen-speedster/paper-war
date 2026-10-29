@@ -6,7 +6,7 @@ import { useTheme } from "@hooks/useTheme";
 import { DEFAULT_CONFIG } from "@lib/game/config";
 import { Button } from "@components/ui/Button";
 import { t } from "@lib/i18n";
-import { SoldierFigure, QueenFigure, KingFigure } from "@components/units/StickFigure";
+import { SoldierFigure, BomberFigure, QueenFigure, KingFigure } from "@components/units/StickFigure";
 import { useResizeObserver } from "@hooks/useResizeObserver";
 import { clamp01 } from "@lib/game/geometry";
 import { isValidPlacement } from "@lib/game/placement";
@@ -20,12 +20,14 @@ interface Props {
 
 const FIGURE_MAP = {
   soldier: SoldierFigure,
+  bomber: BomberFigure,
   queen: QueenFigure,
   king: KingFigure,
 } satisfies Record<UnitType, React.ComponentType<{ size?: number; color?: string }>>;
 
 const UNIT_LABELS: Record<UnitType, string> = {
   soldier: "Soldier",
+  bomber: "Bomber soldier",
   queen: "Queen",
   king: "King",
 };
@@ -138,6 +140,7 @@ export function UnitDeployment({ playerId, onReady }: Props) {
   function unitColor(type: UnitType): string {
     if (type === "king") return "var(--pw-accent)";
     if (type === "queen") return "var(--pw-text)";
+    if (type === "bomber") return "#d97706";
     return "var(--pw-text-muted)";
   }
 
@@ -191,6 +194,7 @@ export function UnitDeployment({ playerId, onReady }: Props) {
           {/* Placed units */}
           {placedUnits.map((unit) => {
             const r = (C.HIT_RADIUS[unit.type] / C.REF_SIZE) * Math.min(boardSize.width, boardSize.height);
+            const blastRadiusPx = (C.BOMBER_BLAST_RADIUS / C.REF_SIZE) * Math.min(boardSize.width, boardSize.height);
             const cx = unit.pos.x * boardSize.width;
             const cy = unit.pos.y * boardSize.height;
             const Figure = FIGURE_MAP[unit.type];
@@ -218,6 +222,23 @@ export function UnitDeployment({ playerId, onReady }: Props) {
                 }}
                 aria-label={UNIT_LABELS[unit.type]}
               >
+                {unit.type === "bomber" && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: r - blastRadiusPx,
+                      top: r - blastRadiusPx,
+                      width: blastRadiusPx * 2,
+                      height: blastRadiusPx * 2,
+                      borderRadius: "50%",
+                      border: "1px dashed #d97706",
+                      background: "rgba(217,119,6,0.035)",
+                      pointerEvents: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                )}
                 <Figure size={r * 1.5} color={unitColor(unit.type)} />
               </div>
             );
@@ -226,6 +247,7 @@ export function UnitDeployment({ playerId, onReady }: Props) {
           {/* Ghost preview */}
           {ghostPos && ghostUnit && (() => {
             const r = (C.HIT_RADIUS[ghostUnit.type] / C.REF_SIZE) * Math.min(boardSize.width, boardSize.height);
+            const blastRadiusPx = (C.BOMBER_BLAST_RADIUS / C.REF_SIZE) * Math.min(boardSize.width, boardSize.height);
             const cx = ghostPos.x * boardSize.width;
             const cy = ghostPos.y * boardSize.height;
             const Figure = FIGURE_MAP[ghostUnit.type];
@@ -250,6 +272,23 @@ export function UnitDeployment({ playerId, onReady }: Props) {
                   opacity: 0.85,
                 }}
               >
+                {ghostUnit.type === "bomber" && (
+                  <div
+                    aria-hidden="true"
+                    style={{
+                      position: "absolute",
+                      left: r - blastRadiusPx,
+                      top: r - blastRadiusPx,
+                      width: blastRadiusPx * 2,
+                      height: blastRadiusPx * 2,
+                      borderRadius: "50%",
+                      border: "1px dashed #d97706",
+                      background: "rgba(217,119,6,0.035)",
+                      pointerEvents: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                )}
                 <Figure size={r * 1.5} color={color} />
               </div>
             );

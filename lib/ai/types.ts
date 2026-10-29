@@ -14,6 +14,10 @@ export interface AIView {
   /** Own shots history with results */
   shotHistory: import("../game/types").Shot[];
   config: GameConfig;
+  /** This is the AI's randomly assigned powered bomber shot. */
+  bomberPowerShot?: boolean;
+  /** Battlefield is portrait, so the fold mirrors Y instead of X. */
+  isPortrait?: boolean;
   rng: RNG;
 }
 

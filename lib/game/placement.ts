@@ -2,7 +2,7 @@
  * Placement validation and random placement for Paper War.
  * All validation runs in reference space (0..1000).
  */
-import type { Unit, UnitType, Vec2 } from "./types";
+import type { Unit, UnitType, Vec2, RuleConfig } from "./types";
 import { DEFAULT_CONFIG } from "./config";
 import { toRef, distance } from "./geometry";
 import type { RNG } from "./rng";
@@ -69,12 +69,16 @@ export function validateArmy(units: Unit[]): ValidationResult {
  * Build the initial unplaced army for a player.
  * Units have placeholder positions at (0, 0) and alive=true.
  */
-export function buildArmy(playerId: string): Unit[] {
+export function buildArmy(
+  playerId: string,
+  options: Pick<RuleConfig, "soldierCount" | "bomberEnabled"> = C.DEFAULT_RULES
+): Unit[] {
   const units: Unit[] = [];
   let idx = 0;
 
   const types: UnitType[] = [
-    ...Array<UnitType>(C.ARMY.soldier).fill("soldier"),
+    ...Array<UnitType>(options.soldierCount).fill("soldier"),
+    ...(options.bomberEnabled ? ["bomber" as UnitType] : []),
     ...Array<UnitType>(C.ARMY.queen).fill("queen"),
     ...Array<UnitType>(C.ARMY.king).fill("king"),
   ];

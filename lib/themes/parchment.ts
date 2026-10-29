@@ -25,6 +25,7 @@ export const parchmentTheme: ThemeConfig = {
   `,
   hitEffect: {
     soldier: { animationClass: "pw-splat-small", duration: 500 },
+    bomber:  { animationClass: "pw-burnt-hole", duration: 600 },
     queen:   { animationClass: "pw-burnt-hole", duration: 700 },
     king:    { animationClass: "pw-burnt-hole-large", duration: 800 },
   },

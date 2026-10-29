@@ -36,6 +36,7 @@ export const blueprintTheme: ThemeConfig = {
   `,
   hitEffect: {
     soldier: { animationClass: "pw-particle-burst-small", duration: 500, particleCount: 20 },
+    bomber:  { animationClass: "pw-particle-burst-large", duration: 550, particleCount: 28 },
     queen:   { animationClass: "pw-particle-burst-large", duration: 600, particleCount: 35 },
     king:    { animationClass: "pw-particle-burst-large", duration: 700, particleCount: 40 },
   },

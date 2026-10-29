@@ -88,7 +88,14 @@ export function loadGameState(): GameState | null {
     if (!stored || typeof stored !== "object") return null;
     if (stored.version !== VERSION) return null;
     if (!stored.state || typeof stored.state !== "object") return null;
-    return stored.state as GameState;
+    const state = stored.state as GameState;
+    return {
+      ...state,
+      config: {
+        ...state.config,
+        rules: { ...DEFAULT_CONFIG.DEFAULT_RULES, ...(state.config?.rules ?? {}) },
+      },
+    };
   });
 }
 

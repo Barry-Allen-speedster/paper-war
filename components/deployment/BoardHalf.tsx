@@ -99,7 +99,7 @@ export function BoardHalf({ units, selectedUnitId, backgroundCss, onPlace, onDra
         const radiusPx = (radiusRef / C.REF_SIZE) * Math.min(size.width, size.height);
         const cx = unit.pos.x * size.width;
         const cy = unit.pos.y * size.height;
-        const unitEmoji = ({ soldier: "🗡", queen: "♛", king: "♔" } as const)[unit.type];
+        const unitEmoji = ({ soldier: "🗡", bomber: "💣", queen: "♛", king: "♔" } as const)[unit.type];
         const isDragging = unit.id === draggingId;
 
         return (
