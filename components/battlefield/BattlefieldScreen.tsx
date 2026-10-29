@@ -22,6 +22,8 @@ import { ShotMark } from "./ShotMark";
 import { AimingReticle } from "./AimingReticle";
 import { FoldAnimationLayer } from "./FoldAnimationLayer";
 import { ShotLogDrawer } from "./ShotLogDrawer";
+import { getAudioService } from "@lib/audio/audioService";
+import { useSettingsStore } from "@hooks/useSettingsStore";
 import type { Shot } from "@lib/game/types";
 
 const C = DEFAULT_CONFIG;
@@ -33,6 +35,7 @@ interface Props {
 export function BattlefieldScreen({ viewingPlayerId }: Props) {
   const { gameState, dispatch } = useGameStore();
   const theme = useTheme();
+  const soundEnabled = useSettingsStore((s) => s.soundEnabled);
   const [boardRef, boardSize] = useResizeObserver<HTMLDivElement>();
 
   // Refs for fold animation — one per half
@@ -126,6 +129,17 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
     setResolvedShot(shot);
     setResultVisible(true);
 
+    // ── Audio ──────────────────────────────────────────────────────────────
+    const audio = getAudioService();
+    audio.init();
+    audio.setMuted(!soundEnabled);
+    audio.play("press"); // paper thud
+    setTimeout(() => {
+      if (shot.result === "kill") audio.play("kill");
+      else if (shot.result === "hit") audio.play("hit");
+      else if (shot.result === "miss") audio.play("miss");
+    }, 80);
+
     if (typeof navigator !== "undefined" && navigator.vibrate) {
       navigator.vibrate(shot.result === "miss" ? [25] : [60, 20, 60]);
     }
@@ -155,6 +169,11 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
 
   function handleFire() {
     if (!isAiming) return;
+    // Init audio and play fire sound on first gesture
+    const audio = getAudioService();
+    audio.init();
+    audio.setMuted(!soundEnabled);
+    audio.play("fire");
     dispatch({ type: "FIRE" });
   }
 
@@ -192,8 +211,10 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
         </span>
         <span className="text-xs flex gap-1">
           {config.rules.queenTakesTwo && <span title="Queen takes 2 hits">♛×2</span>}
+          {config.rules.kingTakesFour && <span title="King takes 4 hits">♔×4</span>}
           {config.rules.allUnitsWin && <span title="Must destroy all units">☠</span>}
           {config.rules.queenKillSkipsTurn && <span title="Queen kill skips turn">⏭</span>}
+          {config.rules.streakRevive && <span title="3 soldier streak = revive">🎖</span>}
         </span>
       </div>
 
@@ -350,8 +371,34 @@ export function BattlefieldScreen({ viewingPlayerId }: Props) {
           </div>
         )}
 
-        {/* ── Shot log ─────────────────────────────────────────────────── */}
-        <ShotLogDrawer shots={allShots} />
+        {/* ── Revival picker (streakRevive rule) ───────────────────────── */}
+        {gameState.pendingRevivePlayerId === viewingPlayerId && (
+          <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60">
+            <div className="bg-[var(--pw-surface)] rounded-2xl p-6 max-w-sm mx-4 shadow-2xl">
+              <p className="text-lg font-bold mb-1">🎖 Revival!</p>
+              <p className="text-sm text-[var(--pw-text-muted)] mb-4">
+                3 soldiers eliminated in a row! Choose one of your fallen soldiers to revive.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {players[viewingPlayerId === "p1" ? 0 : 1]!.units
+                  .filter((u) => u.type === "soldier" && !u.alive)
+                  .map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() => dispatch({ type: "REVIVE_SOLDIER", playerId: viewingPlayerId, unitId: u.id })}
+                      className="px-4 py-2 rounded-lg bg-[var(--pw-accent)] text-white font-semibold text-sm hover:opacity-90"
+                    >
+                      Revive Soldier
+                    </button>
+                  ))}
+                {players[viewingPlayerId === "p1" ? 0 : 1]!.units
+                  .filter((u) => u.type === "soldier" && !u.alive).length === 0 && (
+                  <p className="text-sm text-[var(--pw-text-muted)]">No fallen soldiers to revive.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── ARIA live ────────────────────────────────────────────────────── */}

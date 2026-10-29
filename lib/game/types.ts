@@ -48,11 +48,15 @@ export type GameMode = "local" | "ai" | "online";
 export type Difficulty = "easy" | "medium" | "hard";
 
 export interface RuleConfig {
-  shotsPerTurn: number;       // 1..3 — how many shots each player fires per turn
-  queenTakesTwo: boolean;     // Queen requires 2 hits to kill
-  queenKillSkipsTurn: boolean;// Killing opponent's Queen skips their next turn
-  allUnitsWin: boolean;       // Must destroy ALL units to win (not just King)
+  shotsPerTurn: number;
+  queenTakesTwo: boolean;
+  queenKillSkipsTurn: boolean;
+  allUnitsWin: boolean;
   showUnitsAfterReady: boolean;
+  /** King requires 4 hits to kill instead of 1 */
+  kingTakesFour: boolean;
+  /** 3 soldier kills in a row (no misses) lets you revive one dead soldier, if your Queen is alive */
+  streakRevive: boolean;
 }
 
 export interface GameConfig {
@@ -89,6 +93,10 @@ export interface GameState {
   revealedKingQuadrant: 0 | 1 | 2 | 3 | null;
   /** Set when queenKillSkipsTurn rule fires — this player's next turn is skipped */
   skippedTurnPlayerId: PlayerId | null;
+  /** Consecutive soldier kills by the current attacker (for streakRevive rule) */
+  consecutiveSoldierKills: number;
+  /** When streakRevive triggers, the attacker can revive one dead soldier */
+  pendingRevivePlayerId: PlayerId | null;
 }
 
 export type GameAction =
@@ -107,6 +115,7 @@ export type GameAction =
   | { type: "END_TURN" }
   | { type: "GAME_OVER"; winner: PlayerId }
   | { type: "SYNC_ERROR" }
-  | { type: "ADVANCE_FROM_LOBBY" }  // online: both connected, move to Setup
+  | { type: "ADVANCE_FROM_LOBBY" }
+  | { type: "REVIVE_SOLDIER"; playerId: PlayerId; unitId: string }
   | { type: "REMATCH" }
   | { type: "RETURN_TO_MENU" };

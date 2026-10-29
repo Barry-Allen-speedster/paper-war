@@ -73,8 +73,10 @@ export const DEFAULT_CONFIG = {
     queenKillSkipsTurn: false,
     allUnitsWin: false,
     showUnitsAfterReady: true,
+    kingTakesFour: false,
+    streakRevive: false,
   } satisfies RuleConfig,
 
   // ─── Storage ──────────────────────────────────────────────────────────────
-  STORAGE_VERSION: 2,
+  STORAGE_VERSION: 3,
 } as const;

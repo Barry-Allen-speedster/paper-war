@@ -53,6 +53,16 @@ export function RulesPanel() {
           label: "Win by eliminating all units",
           desc: "Killing the King alone is not enough — you must destroy every single enemy unit to win.",
         },
+        {
+          key: "kingTakesFour" as const,
+          label: "King takes 4 hits",
+          desc: "The King is armoured — it takes 4 direct hits to kill him instead of 1.",
+        },
+        {
+          key: "streakRevive" as const,
+          label: "Streak revival",
+          desc: "Kill 3 enemy soldiers in a row without missing and revive one of your own dead soldiers (Queen must be alive).",
+        },
       ]).map(({ key, label, desc }) => (
         <label
           key={key}
@@ -82,7 +92,7 @@ export function RulesPanel() {
       ))}
 
       {/* Active rules summary */}
-      {(rules.queenTakesTwo || rules.queenKillSkipsTurn || rules.allUnitsWin || rules.shotsPerTurn > 1) && (
+      {(rules.queenTakesTwo || rules.queenKillSkipsTurn || rules.allUnitsWin || rules.shotsPerTurn > 1 || rules.kingTakesFour || rules.streakRevive) && (
         <div className="mt-1 p-2 rounded-lg bg-[var(--pw-accent)]/10 border border-[var(--pw-accent)]/30">
           <p className="text-xs font-semibold text-[var(--pw-accent)] mb-1">Active rules:</p>
           <ul className="text-xs text-[var(--pw-text)] space-y-0.5">
@@ -90,6 +100,8 @@ export function RulesPanel() {
             {rules.queenTakesTwo && <li>• Queen requires 2 hits</li>}
             {rules.queenKillSkipsTurn && <li>• Queen kill skips opponent&apos;s turn</li>}
             {rules.allUnitsWin && <li>• Must destroy all units to win</li>}
+            {rules.kingTakesFour && <li>• King requires 4 hits</li>}
+            {rules.streakRevive && <li>• 3 soldier kills in a row = revive one soldier</li>}
           </ul>
         </div>
       )}

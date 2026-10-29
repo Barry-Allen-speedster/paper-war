@@ -93,7 +93,10 @@ export function applyShot(
 export function applyRulesToArmy(units: Unit[], rules: RuleConfig): Unit[] {
   return units.map((u): Unit => ({
     ...u,
-    hitsRemaining: u.type === "queen" && rules.queenTakesTwo ? 2 : 1,
+    hitsRemaining:
+      u.type === "queen" && rules.queenTakesTwo ? 2 :
+      u.type === "king"  && rules.kingTakesFour ? 4 :
+      1,
   }));
 }
 

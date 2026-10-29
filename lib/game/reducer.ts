@@ -76,6 +76,8 @@ export function createInitialState(): GameState {
     syncError: false,
     revealedKingQuadrant: null,
     skippedTurnPlayerId: null,
+    consecutiveSoldierKills: 0,
+    pendingRevivePlayerId: null,
   };
 }
 
@@ -220,11 +222,44 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       let nextState = setPlayer(state, updatedDefender);
       nextState = setPlayer(nextState, updatedAttacker);
+
+      // ── Streak tracking for streakRevive rule ──────────────────────────
+      let consecutiveSoldierKills = state.consecutiveSoldierKills;
+      let pendingRevivePlayerId: PlayerId | null = null;
+
+      if (state.config.rules.streakRevive) {
+        if (resolvedShot.result === "kill" && resolvedShot.killedUnitType === "soldier") {
+          consecutiveSoldierKills += 1;
+          // 3 soldier kills in a row → check if attacker's Queen is alive
+          if (consecutiveSoldierKills >= 3) {
+            const attackerState = getPlayer(nextState, attackerId);
+            const queenAlive = attackerState.units.some(
+              (u) => u.type === "queen" && u.alive
+            );
+            if (queenAlive) {
+              // Trigger revival opportunity — attacker picks a dead soldier
+              const hasDead = attackerState.units.some(
+                (u) => u.type === "soldier" && !u.alive
+              );
+              if (hasDead) {
+                pendingRevivePlayerId = attackerId;
+              }
+            }
+            consecutiveSoldierKills = 0; // reset streak
+          }
+        } else if (resolvedShot.result === "miss" || resolvedShot.result === "waste") {
+          consecutiveSoldierKills = 0; // miss breaks the streak
+        }
+        // "hit" (not kill) doesn't break or advance the streak
+      }
+
       nextState = {
         ...nextState,
         pendingShot: resolvedShot,
         revealedKingQuadrant: resolvedShot.revealedQuadrant ?? state.revealedKingQuadrant,
         skippedTurnPlayerId: getSkippedPlayer(computed, defenderId, state.config.rules),
+        consecutiveSoldierKills,
+        pendingRevivePlayerId,
       };
 
       // Check win condition
@@ -299,6 +334,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return { ...state, syncError: true };
     }
 
+    case "REVIVE_SOLDIER": {
+      const player = getPlayer(state, action.playerId);
+      const updatedUnits = player.units.map((u) =>
+        u.id === action.unitId && u.type === "soldier" && !u.alive
+          ? { ...u, alive: true, hitsRemaining: 1 }
+          : u
+      );
+      return {
+        ...setPlayer(state, { ...player, units: updatedUnits }),
+        pendingRevivePlayerId: null,
+      };
+    }
+
     case "REMATCH": {
       if (state.phase !== "GameOver") return state;
       const fresh = createInitialState();
@@ -308,6 +356,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         config: state.config,
         players: [makePlayer("p1"), makePlayer("p2")],
         shotsRemainingInTurn: state.config.rules.shotsPerTurn,
+        consecutiveSoldierKills: 0,
+        pendingRevivePlayerId: null,
       };
     }
 
