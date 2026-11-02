@@ -56,9 +56,9 @@ export const DEFAULT_CONFIG = {
   /** Turns to hunt after a hit */
   MEDIUM_AI_HIT_TURNS: 2,
   /** Minimum think time in ms */
-  AI_THINK_MIN_MS: 700,
+  AI_THINK_MIN_MS: 450,
   /** Maximum think time in ms */
-  AI_THINK_MAX_MS: 1500,
+  AI_THINK_MAX_MS: 900,
 
   // ─── Network ──────────────────────────────────────────────────────────────
   MAX_CODE_RETRIES: 5,

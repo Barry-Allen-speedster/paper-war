@@ -25,8 +25,8 @@ import { idealAimPos, applyAimError, countOverlap, bestBomberPowerAim } from "./
 import { DEFAULT_CONFIG } from "../game/config";
 import { getBomberBlastVictimIds } from "../game/rules";
 
-const HARD_SIGMA = 6;
-const CLUSTER_SAMPLES = 50;
+const HARD_SIGMA = 3;
+const CLUSTER_SAMPLES = 120;
 
 export class HardAI implements AIStrategy {
   private queenKilledThisTurn = false;

@@ -8,10 +8,12 @@
  */
 import type { Vec2, Unit } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
-import { idealAimPos, applyAimError, bestBomberPowerAim } from "./aimError";
+import { idealAimPos, applyAimError, bestBomberPowerAim, countOverlap } from "./aimError";
 import { getBomberBlastVictimIds } from "../game/rules";
+import { DEFAULT_CONFIG } from "../game/config";
 
-const MEDIUM_SIGMA = 28;
+const MEDIUM_SIGMA = 18;
+const CLUSTER_SAMPLES = 40;
 
 export class MediumAI implements AIStrategy {
   private lastTarget: Vec2 | null = null;
@@ -52,10 +54,10 @@ export class MediumAI implements AIStrategy {
 
     // Pick target based on active rules
     const target = this.pickTarget(visibleEnemyUnits, shotHistory, rules);
-    const aim = idealAimPos(target, view.isPortrait);
+    const aim = this.findClusterAim(target, visibleEnemyUnits, rng, view.isPortrait);
     this.lastTarget = aim;
     this.lastTargetUnit = target;
-    const shot = applyAimError(aim, MEDIUM_SIGMA, rng);
+    const shot = applyAimError(aim, MEDIUM_SIGMA * 0.55, rng);
     this.lastShot = shot;
     return shot;
   }
@@ -91,5 +93,30 @@ export class MediumAI implements AIStrategy {
 
     // Fallback: any unit
     return units[0]!;
+  }
+
+  private findClusterAim(target: Unit, units: Unit[], rng: AIView["rng"], isPortrait = false): Vec2 {
+    const exactAim = idealAimPos(target, isPortrait);
+    let bestAim = exactAim;
+    const targetLanding = target.pos;
+    let bestScore = countOverlap(targetLanding, units);
+    const targetRadius = (DEFAULT_CONFIG.HIT_RADIUS[target.type] + DEFAULT_CONFIG.SHOT_RADIUS) / DEFAULT_CONFIG.REF_SIZE;
+
+    for (let i = 0; i < CLUSTER_SAMPLES; i++) {
+      const candidateAim = applyAimError(exactAim, MEDIUM_SIGMA * 2, rng);
+      const landing = isPortrait
+        ? { x: candidateAim.x, y: 1 - candidateAim.y }
+        : { x: 1 - candidateAim.x, y: candidateAim.y };
+      const dx = landing.x - target.pos.x;
+      const dy = landing.y - target.pos.y;
+      if (dx * dx + dy * dy > targetRadius * targetRadius) continue;
+
+      const score = countOverlap(landing, units);
+      if (score > bestScore) {
+        bestScore = score;
+        bestAim = candidateAim;
+      }
+    }
+    return bestAim;
   }
 }

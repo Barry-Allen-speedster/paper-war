@@ -6,8 +6,8 @@ import type { Vec2 } from "../game/types";
 import type { AIStrategy, AIView } from "./types";
 import { idealAimPos, applyAimError, bestBomberPowerAim } from "./aimError";
 
-const EASY_SIGMA = 65;
-const RANDOM_CHANCE = 0.30;
+const EASY_SIGMA = 52;
+const RANDOM_CHANCE = 0.18;
 
 export class EasyAI implements AIStrategy {
   chooseShot(view: AIView): Vec2 {
